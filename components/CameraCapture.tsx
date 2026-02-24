@@ -19,22 +19,16 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } // Ön kamera önceliği
+        video: { facingMode: 'user' }
       });
       
-      setStream(mediaStream);
-      
-      // Video elementine kaynağı ver
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      setStream(mediaStream); // Sadece state'e atıp bırakıyoruz
       setError(null);
     } catch (err) {
       setError("Kameraya erişilemedi. İzinleri kontrol et.");
       console.error(err);
     }
   };
-
   // Kamerayı Durdur (Stream'i kapat)
   const stopCamera = () => {
     if (stream) {
@@ -80,8 +74,11 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
 
   // Component kapanırken kamerayı temizle (Memory leak önleme)
   useEffect(() => {
-    return () => stopCamera();
-  }, [stream]);
+  // Eğer stream varsa ve video etiketi ekrana geldiyse bağla!
+  if (videoRef.current && stream) {
+    videoRef.current.srcObject = stream;
+  }
+  }, [stream]); // stream her değiştiğinde bu kodu tetikle
 
   return (
     <div className="flex flex-col items-center gap-4 p-4 border rounded-xl bg-white shadow-sm w-full">
@@ -91,7 +88,7 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
       {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
 
       {/* Görüntü Alanı */}
-      <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+      <div className="aspect-video bg-black rounded-md overflow-hidden flex items-center justify-center">
         {!image ? (
           /* Kamera Modu */
           !stream ? (
@@ -100,7 +97,7 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
                <p className="mb-2">Kamera kapalı</p>
                <button 
                  onClick={startCamera}
-                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                 className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
                >
                  Kamerayı Başlat
                </button>
@@ -112,7 +109,8 @@ export default function CameraCapture({ onCapture }: CameraCaptureProps) {
               autoPlay 
               playsInline 
               muted 
-              className="w-full h-full object-cover"
+              // w-full'un yanına şunları ekledik:
+              className="w-full aspect-video object-cover rounded-md"
             />
           )
         ) : (
