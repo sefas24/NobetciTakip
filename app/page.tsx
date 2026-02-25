@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import CameraCapture from './components/CameraCapture'; // Kameranın olduğu dizine göre ayarla
+import CameraCapture from '@/components/CameraCapture';
 
 export default function HomePage() {
   return (
