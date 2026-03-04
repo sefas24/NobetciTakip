@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const pref = addPreference(email, slots);
-  return NextResponse.json({ ok: true, item: pref });
+  const prefs = addPreference(email, slots);
+  return NextResponse.json({ ok: true, items: prefs });
 }
 
