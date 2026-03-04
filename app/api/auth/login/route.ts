@@ -19,19 +19,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
     }
 
-    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
-
-    // NextResponse'u oluştur
-    const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
-
     // Ortak Cookie Ayarları
+    // Vercel üzerindeki potansiyel Secure/Domain/SameSite hatalarını önlemek 
+    // ve çerezin her halükarda tarayıcıya oturmasını sağlamak için en temel hale getirdik.
     const cookieOptions = {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax" as const,
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 gün
     };
+
+    // NextResponse'u oluştur
+    const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
 
     // Vercel Edge Middleware'inin Response ile dönen çerezleri anında yakalayabilmesi 
     // ve set-cookie header arızasını önlemek için doğrudan res objesine ekliyoruz.
