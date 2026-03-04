@@ -20,7 +20,9 @@ export async function POST(req: Request) {
     }
 
     const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
-    const cookieStore = await cookies();
+
+    // NextResponse'u oluştur
+    const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
 
     // Ortak Cookie Ayarları
     const cookieOptions = {
@@ -31,11 +33,13 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 24 * 30, // 30 gün
     };
 
-    cookieStore.set("nt_session", "1", cookieOptions);
-    cookieStore.set("nt_role", result.role, cookieOptions);
-    cookieStore.set("nt_email", result.email, cookieOptions);
+    // Vercel Edge Middleware'inin Response ile dönen çerezleri anında yakalayabilmesi 
+    // ve set-cookie header arızasını önlemek için doğrudan res objesine ekliyoruz.
+    res.cookies.set("nt_session", "1", cookieOptions);
+    res.cookies.set("nt_role", result.role, cookieOptions);
+    res.cookies.set("nt_email", result.email, cookieOptions);
 
-    return NextResponse.json({ ok: true, email: result.email, role: result.role });
+    return res;
   } catch {
     return NextResponse.json(
       { ok: false, message: "Giriş sırasında hata oluştu." },
