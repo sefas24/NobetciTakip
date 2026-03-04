@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateLogin, type UserRole } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
   try {
@@ -18,36 +19,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
     }
 
-    // Vercel production'da HTTPS, lokal'de HTTP
     const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
-    
-    const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
+    const cookieStore = await cookies();
 
-    // HttpOnly cookie: middleware ve server component'lar okuyabilir, client JS okuyamaz.
-    // Basit bir "oturum var" işareti + rol + email tutuyoruz.
-    res.cookies.set("nt_session", "1", {
+    // Ortak Cookie Ayarları
+    const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "lax",
+      sameSite: "lax" as const,
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-    res.cookies.set("nt_role", result.role, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-    res.cookies.set("nt_email", result.email, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+      maxAge: 60 * 60 * 24 * 30, // 30 gün
+    };
 
-    return res;
+    cookieStore.set("nt_session", "1", cookieOptions);
+    cookieStore.set("nt_role", result.role, cookieOptions);
+    cookieStore.set("nt_email", result.email, cookieOptions);
+
+    return NextResponse.json({ ok: true, email: result.email, role: result.role });
   } catch {
     return NextResponse.json(
       { ok: false, message: "Giriş sırasında hata oluştu." },

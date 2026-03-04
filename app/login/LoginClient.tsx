@@ -49,8 +49,11 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
         nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
           ? nextPath
           : "/";
-      router.push(target);
-      router.refresh();
+
+      // Next.js App Router üzerinde bazen router.push ve router.refresh cookie değişikliklerini 
+      // anında sunucuya (middleware'e) iletemeyebiliyor veya cache'ten sayfa getirebiliyor.
+      // Bunu engellemek ve cookie'nin tüm sistemde algılanmasını sağlamak için hard refresh yapıyoruz.
+      window.location.href = target;
     } catch {
       setError("Giriş sırasında hata oluştu.");
       setLoading(false);
@@ -64,22 +67,20 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
           <button
             type="button"
             onClick={() => setRole("student")}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
-              role === "student"
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${role === "student"
                 ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white text-gray-700 border-gray-200 hover:border-blue-400"
-            }`}
+              }`}
           >
             Normal Giriş
           </button>
           <button
             type="button"
             onClick={() => setRole("admin")}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
-              role === "admin"
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${role === "admin"
                 ? "bg-gray-900 text-white border-gray-900"
                 : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
-            }`}
+              }`}
           >
             Admin Girişi
           </button>
@@ -130,9 +131,8 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-md mt-4 ${
-              loading ? "opacity-70 cursor-not-allowed" : ""
-            }`}
+            className={`w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-md mt-4 ${loading ? "opacity-70 cursor-not-allowed" : ""
+              }`}
           >
             {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
           </button>
