@@ -29,6 +29,7 @@ export default async function AnaSayfa() {
           <div className="flex items-center gap-2">
             <Link
               href="/logout"
+              prefetch={false}
               className="text-xs bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-full hover:border-gray-300 transition"
             >
               Çıkış
@@ -42,6 +43,7 @@ export default async function AnaSayfa() {
         {/* 1. Kamera */}
         <Link
           href="/kamera"
+          prefetch={false}
           className="w-full max-w-md bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-2xl px-6 py-4 shadow-lg flex items-center gap-4 hover:shadow-xl transition"
         >
           <div className="text-3xl">📸</div>
@@ -56,6 +58,7 @@ export default async function AnaSayfa() {
         {/* 2. Mesaisi Olanlar & Nöbetçiler */}
         <Link
           href="/mesai-nobet"
+          prefetch={false}
           className="w-full max-w-md bg-white border border-gray-200 text-gray-900 rounded-2xl px-6 py-4 shadow-sm flex items-center gap-4 hover:border-blue-400 hover:shadow-md transition"
         >
           <div className="text-3xl">📋</div>
@@ -72,6 +75,7 @@ export default async function AnaSayfa() {
         {/* 3. Gün Seçimi */}
         <Link
           href="/gun-secimi"
+          prefetch={false}
           className="w-full max-w-md bg-white border border-gray-200 text-gray-900 rounded-2xl px-6 py-4 shadow-sm flex items-center gap-4 hover:border-blue-400 hover:shadow-md transition"
         >
           <div className="text-3xl">📅</div>
