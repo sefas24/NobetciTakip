@@ -19,25 +19,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
     }
 
-    // Ortak Cookie Ayarları
-    // Vercel üzerindeki potansiyel Secure/Domain/SameSite hatalarını önlemek 
-    // ve çerezin her halükarda tarayıcıya oturmasını sağlamak için en temel hale getirdik.
+    const cookieStore = await cookies();
+
+    // Cookie ayarlarında gereksiz zorlamaları kaldırdık ama güvenliği node ortamına göre ayarlıyoruz
     const cookieOptions = {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
       path: "/",
       maxAge: 60 * 60 * 24 * 30, // 30 gün
     };
 
-    // NextResponse'u oluştur
-    const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
+    cookieStore.set("nt_session", "1", cookieOptions);
+    cookieStore.set("nt_role", result.role, cookieOptions);
+    cookieStore.set("nt_email", result.email, cookieOptions);
 
-    // Vercel Edge Middleware'inin Response ile dönen çerezleri anında yakalayabilmesi 
-    // ve set-cookie header arızasını önlemek için doğrudan res objesine ekliyoruz.
-    res.cookies.set("nt_session", "1", cookieOptions);
-    res.cookies.set("nt_role", result.role, cookieOptions);
-    res.cookies.set("nt_email", result.email, cookieOptions);
-
-    return res;
+    return NextResponse.json({ ok: true, email: result.email, role: result.role });
   } catch {
     return NextResponse.json(
       { ok: false, message: "Giriş sırasında hata oluştu." },

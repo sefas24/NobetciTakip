@@ -24,7 +24,10 @@ export function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    // Vercel / Next.js önbelleğinin "Giriş sayfasına atma" (307) işlemini hafızaya almasını tamamen engelle.
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    return response;
   }
 
   // Admin sayfasına sadece admin role ile girilsin
@@ -33,7 +36,9 @@ export function middleware(req: NextRequest) {
     if (role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/";
-      return NextResponse.redirect(url);
+      const response = NextResponse.redirect(url);
+      response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      return response;
     }
   }
 
