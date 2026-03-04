@@ -1,21 +1,20 @@
 export type UserRole = "admin" | "student";
 
-// Şimdilik sahte kullanıcılar (backend gelince burası DB/Supabase olur)
+// İkinci Madde: Admin şifreleri manuel olarak sadece buradan (veya çevre değişkeninden) belirlenir.
 const ADMINS = [
-  { email: "admin@okul.com", password: "1234" },
-  { email: "mudur@okul.com", password: "1234" },
+  { email: "admin@okul.edu.tr", password: "admin_gizli_sifre_1" },
+  { email: "mudur@okul.edu.tr", password: "mudur_gizli_sifre_2" },
 ];
 
-const STUDENTS = [
-  { email: "ogrenci1@okul.com", password: "1234" },
-  { email: "ogrenci2@okul.com", password: "1234" },
-];
+// Birinci Madde: Öğrenci şifre değişikliklerini geçici olarak tutacak hafıza
+// (Backend/DB bağlandığında bu veritabanına yazılmalı)
+const STUDENT_PASSWORDS = new Map<string, string>();
 
 export function validateLogin(input: {
   role: UserRole;
   email: string;
   password: string;
-}): { ok: true; email: string; role: UserRole } | { ok: false; message: string } {
+}): { ok: true; email: string; role: UserRole; needsPasswordChange?: boolean } | { ok: false; message: string } {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
 
@@ -23,13 +22,31 @@ export function validateLogin(input: {
     return { ok: false, message: "E-posta ve şifre zorunludur." };
   }
 
-  const list = input.role === "admin" ? ADMINS : STUDENTS;
-  const match = list.some((u) => u.email.toLowerCase() === email && u.password === password);
+  if (input.role === "admin") {
+    const match = ADMINS.some((u) => u.email.toLowerCase() === email && u.password === password);
+    if (!match) {
+      return { ok: false, message: "Yönetici e-posta veya şifresi hatalı." };
+    }
+    return { ok: true, email, role: "admin", needsPasswordChange: false };
+  } else {
+    // Öğrenci Formati: öğrencinumarası@okul.edu.tr vb.
+    const [prefix] = email.split("@");
 
-  if (!match) {
-    return { ok: false, message: "E-posta veya şifre hatalı." };
+    // Öğrenci şifre değiştirmişse yeni şifresi, değiştirmemişse default şifresi (numarası/prefix)
+    const currentPassword = STUDENT_PASSWORDS.get(email) || prefix;
+
+    if (password !== currentPassword) {
+      return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
+    }
+
+    // Eğer şifresi halen prefix (email'in ilk kısmı) ise, şifre belirlemesi gerekiyor demektir.
+    const needsPasswordChange = (password === prefix);
+    return { ok: true, email, role: "student", needsPasswordChange };
   }
+}
 
-  return { ok: true, email, role: input.role };
+// Şifre belirleme formundan gelen yeni şifreyi kaydedecek metod
+export function updateStudentPassword(email: string, newPassword: string) {
+  STUDENT_PASSWORDS.set(email.toLowerCase(), newPassword);
 }
 

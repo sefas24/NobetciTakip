@@ -34,7 +34,12 @@ export async function POST(req: Request) {
     cookieStore.set("nt_role", result.role, cookieOptions);
     cookieStore.set("nt_email", result.email, cookieOptions);
 
-    return NextResponse.json({ ok: true, email: result.email, role: result.role });
+    return NextResponse.json({
+      ok: true,
+      email: result.email,
+      role: result.role,
+      needsPasswordChange: result.needsPasswordChange
+    });
   } catch {
     return NextResponse.json(
       { ok: false, message: "Giriş sırasında hata oluştu." },

@@ -22,7 +22,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
     () =>
       role === "admin"
         ? "Yönetim paneline sadece yetkililer girebilir"
-        : "Öğrenci maili ve şifre ile giriş yap",
+        : "Okul mailiniz ve şifreniz (İlk kez girecekseniz öğrenci numaranız) ile giriş yapın",
     [role]
   );
 
@@ -38,21 +38,23 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
         body: JSON.stringify({ role, email, password }),
       });
 
-      const data = (await res.json()) as { ok: boolean; message?: string };
+      const data = (await res.json()) as { ok: boolean; message?: string; needsPasswordChange?: boolean };
       if (!res.ok || !data.ok) {
         setError(data.message || "Giriş başarısız.");
         setLoading(false);
         return;
       }
 
-      const target =
+      let target =
         nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
           ? nextPath
           : "/";
 
-      // Next.js App Router üzerinde bazen router.push ve router.refresh cookie değişikliklerini 
-      // anında sunucuya (middleware'e) iletemeyebiliyor veya cache'ten sayfa getirebiliyor.
-      // Bunu engellemek ve cookie'nin tüm sistemde algılanmasını sağlamak için hard refresh yapıyoruz.
+      // Eğer öğrencinin şifre belirlemesi gerekiyorsa (ilk kez girdiyse)
+      if (data.needsPasswordChange) {
+        target = "/sifre-belirle";
+      }
+
       window.location.href = target;
     } catch {
       setError("Giriş sırasında hata oluştu.");
@@ -68,8 +70,8 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             type="button"
             onClick={() => setRole("student")}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${role === "student"
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-200 hover:border-blue-400"
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-white text-gray-700 border-gray-200 hover:border-blue-400"
               }`}
           >
             Normal Giriş
@@ -78,8 +80,8 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             type="button"
             onClick={() => setRole("admin")}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${role === "admin"
-                ? "bg-gray-900 text-white border-gray-900"
-                : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
+              ? "bg-gray-900 text-white border-gray-900"
+              : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
               }`}
           >
             Admin Girişi
@@ -99,7 +101,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             <input
               type="email"
               placeholder={
-                role === "admin" ? "admin@okul.com" : "ogrenci1@okul.com"
+                role === "admin" ? "admin@okul.edu.tr" : "ogrencinumarasi@okul.edu.tr"
               }
               value={email}
               onChange={(e) => setEmail(e.target.value)}
