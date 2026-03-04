@@ -24,18 +24,21 @@ export async function POST(req: Request) {
     // Basit bir "oturum var" işareti + rol + email tutuyoruz.
     res.cookies.set("nt_session", "1", {
       httpOnly: true,
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
     res.cookies.set("nt_role", result.role, {
       httpOnly: true,
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
     res.cookies.set("nt_email", result.email, {
       httpOnly: true,
+      secure: true,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
