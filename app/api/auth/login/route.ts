@@ -18,27 +18,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
     }
 
+    // Vercel production'da HTTPS, lokal'de HTTP
+    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+    
     const res = NextResponse.json({ ok: true, email: result.email, role: result.role });
 
     // HttpOnly cookie: middleware ve server component'lar okuyabilir, client JS okuyamaz.
     // Basit bir "oturum var" işareti + rol + email tutuyoruz.
     res.cookies.set("nt_session", "1", {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
     res.cookies.set("nt_role", result.role, {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
     res.cookies.set("nt_email", result.email, {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
