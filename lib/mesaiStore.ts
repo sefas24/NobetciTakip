@@ -11,7 +11,29 @@ export interface MesaiPreference {
 }
 
 // Basit bir in-memory store (server yeniden başlarsa sıfırlanır)
-const preferences: MesaiPreference[] = [];
+const preferences: MesaiPreference[] = [
+  {
+    id: "mock1",
+    email: "20875@okul.edu.tr",
+    slots: ["Pazartesi", "Çarşamba"],
+    status: "pending",
+    isDuty: false,
+  },
+  {
+    id: "mock2",
+    email: "19402@okul.edu.tr",
+    slots: ["Salı"],
+    status: "pending",
+    isDuty: false,
+  },
+  {
+    id: "mock3",
+    email: "76329@okul.edu.tr",
+    slots: ["Cuma"],
+    status: "pending",
+    isDuty: false,
+  }
+];
 
 function createId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
