@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Role = "student" | "admin";
 
@@ -139,6 +140,29 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
           </button>
         </form>
+
+        {/* Ana Sayfaya Dönüş Linki */}
+        <div className="mt-6 text-center">
+          <Link href="/" className="text-sm text-blue-600 hover:text-blue-800 font-medium transition">
+            &larr; Kameraya (Ana Sayfaya) Dön
+          </Link>
+        </div>
+
+        {/* DEMO / TEST AMAÇLI SIFIRLAMA BUTONU */}
+        <div className="mt-8 border-t pt-4 text-center">
+          <button
+            onClick={async () => {
+              if (confirm("Demo Modu: Tüm öğrencilerin yeni belirlediği şifreleri silecek ve herkesi tekrar ilk giriş haline döndüreceksiniz. Emin misiniz?")) {
+                await fetch('/api/auth/reset-demo', { method: 'POST' });
+                alert("Bütün şifreler sıfırlandı! Artık herhangi bir öğrenciyle tekrar '@ öncesi' şifresiyle ilk defa giriyormuş gibi giriş yapabilirsiniz.");
+              }
+            }}
+            type="button"
+            className="text-xs text-red-500 hover:text-red-700 underline"
+          >
+            [Demo Modu] Tüm Şifreleri Sıfırla
+          </button>
+        </div>
 
       </div>
     </div>

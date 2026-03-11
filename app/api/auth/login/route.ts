@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const email = body.email ?? "";
     const password = body.password ?? "";
 
-    const result = validateLogin({ role, email, password });
+    const result = await validateLogin({ role, email, password });
     if (!result.ok) {
       return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
     }

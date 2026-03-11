@@ -1,20 +1,12 @@
+import { supabase } from "./supabase";
+
 export type UserRole = "admin" | "student";
 
-// İkinci Madde: Admin şifreleri manuel olarak sadece buradan (veya çevre değişkeninden) belirlenir.
-const ADMINS = [
-  { email: "admin@okul.edu.tr", password: "admin_gizli_sifre_1" },
-  { email: "mudur@okul.edu.tr", password: "mudur_gizli_sifre_2" },
-];
-
-// Birinci Madde: Öğrenci şifre değişikliklerini geçici olarak tutacak hafıza
-// (Backend/DB bağlandığında bu veritabanına yazılmalı)
-const STUDENT_PASSWORDS = new Map<string, string>();
-
-export function validateLogin(input: {
+export async function validateLogin(input: {
   role: UserRole;
   email: string;
   password: string;
-}): { ok: true; email: string; role: UserRole; needsPasswordChange?: boolean } | { ok: false; message: string } {
+}): Promise<{ ok: true; email: string; role: UserRole; needsPasswordChange?: boolean } | { ok: false; message: string }> {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
 
@@ -22,9 +14,16 @@ export function validateLogin(input: {
     return { ok: false, message: "E-posta ve şifre zorunludur." };
   }
 
+  // Supabase'den kullanıcı sorgula
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+
   if (input.role === "admin") {
-    const match = ADMINS.some((u) => u.email.toLowerCase() === email && u.password === password);
-    if (!match) {
+    // Admin yetkisi kontrolü
+    if (!user || user.role !== "admin" || user.password !== password) {
       return { ok: false, message: "Yönetici e-posta veya şifresi hatalı." };
     }
     return { ok: true, email, role: "admin", needsPasswordChange: false };
@@ -32,21 +31,47 @@ export function validateLogin(input: {
     // Öğrenci Formati: öğrencinumarası@okul.edu.tr vb.
     const [prefix] = email.split("@");
 
-    // Öğrenci şifre değiştirmişse yeni şifresi, değiştirmemişse default şifresi (numarası/prefix)
-    const currentPassword = STUDENT_PASSWORDS.get(email) || prefix;
-
-    if (password !== currentPassword) {
-      return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
+    if (user) {
+      // Daha önceden şifresini belirleyip DB'ye kaydedilmiş öğrenci
+      if (user.password !== password) {
+        return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
+      }
+      return { ok: true, email, role: "student", needsPasswordChange: false };
+    } else {
+      // Veritabanında yoksa, daha şifresini belirlememiş ilk giriş yapan öğrencidir.
+      if (password === prefix) {
+        return { ok: true, email, role: "student", needsPasswordChange: true };
+      } else {
+        return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
+      }
     }
-
-    // Eğer şifresi halen prefix (email'in ilk kısmı) ise, şifre belirlemesi gerekiyor demektir.
-    const needsPasswordChange = (password === prefix);
-    return { ok: true, email, role: "student", needsPasswordChange };
   }
 }
 
 // Şifre belirleme formundan gelen yeni şifreyi kaydedecek metod
-export function updateStudentPassword(email: string, newPassword: string) {
-  STUDENT_PASSWORDS.set(email.toLowerCase(), newPassword);
+export async function updateStudentPassword(email: string, newPassword: string) {
+  const normalizedEmail = email.toLowerCase();
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (user) {
+    // Varsa güncelle
+    await supabase.from("users").update({ password: newPassword }).eq("email", normalizedEmail);
+  } else {
+    // Yoksa (ilk defa belirliyorsa) ekle
+    await supabase.from("users").insert({
+      email: normalizedEmail,
+      password: newPassword,
+      role: "student"
+    });
+  }
+}
+
+// Demo Modu İçin: Bütün öğrenci hesaplarını sıfırlayan metod.
+export async function clearDemoPasswords() {
+  await supabase.from("users").delete().eq("role", "student");
 }
 

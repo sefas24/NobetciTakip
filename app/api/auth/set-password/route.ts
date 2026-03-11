@@ -20,8 +20,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, message: "Yeni şifre en az 4 karakter olmalıdır." }, { status: 400 });
         }
 
-        // Şifreyi hafızaya (lib/auth içerisindeki Map) kaydet
-        updateStudentPassword(email, newPassword);
+        // Şifreyi hafızaya (Supabase'e) kaydet
+        await updateStudentPassword(email, newPassword);
 
         return NextResponse.json({ ok: true, message: "Şifre güncellendi." });
     } catch (error) {

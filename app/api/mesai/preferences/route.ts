@@ -7,7 +7,7 @@ import {
 } from "@/lib/mesaiStore";
 
 export async function GET() {
-  const all = listPreferences();
+  const all = await listPreferences();
   return NextResponse.json({ ok: true, items: all });
 }
 
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const prefs = addPreference(email, slots);
+  const prefs = await addPreference(email, slots);
   return NextResponse.json({ ok: true, items: prefs });
 }
 
