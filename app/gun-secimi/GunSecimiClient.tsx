@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 interface Props {
   email: string | null;
@@ -10,8 +11,7 @@ interface Props {
 export default function GunSecimiClient({ email, slots }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const toggleSlot = (slot: string) => {
     setSelected((prev) =>
@@ -20,29 +20,36 @@ export default function GunSecimiClient({ email, slots }: Props) {
   };
 
   const handleSave = async () => {
-    setMessage(null);
-    setError(null);
+    setErrorDetails(null);
     if (selected.length === 0) {
-      setError("Önce en az bir zaman dilimi seçmelisin.");
+      toast.error("Önce en az bir zaman dilimi seçmelisin.");
       return;
     }
     setSaving(true);
+    const loadingToast = toast.loading("Kaydediliyor...");
+    
     try {
       const res = await fetch("/api/mesai/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: selected }),
       });
-      const data = (await res.json()) as { ok: boolean; message?: string };
+      const data = (await res.json()) as { ok: boolean; message?: string; details?: any };
+      
       if (!res.ok || !data.ok) {
-        setError(data.message ?? "Tercihler kaydedilemedi.");
+        let errDesc = typeof data.details === "string" ? data.details : JSON.stringify(data.details);
+        console.error("API Hatası (Client):", errDesc);
+        toast.error(data.message ?? "Tercihler kaydedilemedi.", { id: loadingToast });
+        setErrorDetails(errDesc);
       } else {
-        setMessage(
-          "Tercihlerin alındı. Admin onayladıktan sonra mesai listesinde gözükecek."
-        );
+        toast.success("Talebiniz başarıyla oluşturuldu!", { id: loadingToast });
+        setSelected([]); // Formu temizle
       }
-    } catch {
-      setError("Bir hata oluştu, lütfen tekrar dene.");
+    } catch (err) {
+      const errDesc = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error("Fetch Hatası (Client):", errDesc);
+      toast.error("Bir hata oluştu, lütfen tekrar dene.", { id: loadingToast });
+      setErrorDetails(errDesc);
     } finally {
       setSaving(false);
     }
@@ -96,14 +103,9 @@ export default function GunSecimiClient({ email, slots }: Props) {
           Tercihlerin önce admin ekranına düşecek, o onayladıktan sonra kesin
           mesai listesi oluşturulacak.
         </p>
-        {error && (
+        {errorDetails && (
           <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-            {error}
-          </p>
-        )}
-        {message && (
-          <p className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
-            {message}
+            Detay: {errorDetails}
           </p>
         )}
         <button

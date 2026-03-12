@@ -11,12 +11,21 @@ export async function POST(req: Request) {
     };
 
     const role = body.role ?? "student";
-    const email = body.email ?? "";
+    const email = body.email || (role === "admin" ? "admin@test.com" : "student@test.com");
     const password = body.password ?? "";
 
-    const result = await validateLogin({ role, email, password });
-    if (!result.ok) {
-      return NextResponse.json({ ok: false, message: result.message }, { status: 401 });
+    // Lokal test için geçici bypass işlemi
+    const isLocalTest = true;
+    let result: { ok: boolean, email: string, role: UserRole, needsPasswordChange?: boolean, message?: string };
+
+    if (isLocalTest) {
+      result = { ok: true, email, role: role as UserRole, needsPasswordChange: false };
+    } else {
+      const authResult = await validateLogin({ role, email, password });
+      if (!authResult.ok) {
+        return NextResponse.json({ ok: false, message: authResult.message }, { status: 401 });
+      }
+      result = authResult as any;
     }
 
     const cookieStore = await cookies();

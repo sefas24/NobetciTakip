@@ -32,7 +32,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const prefs = await addPreference(email, slots);
-  return NextResponse.json({ ok: true, items: prefs });
+  try {
+    const prefs = await addPreference(email, slots);
+    return NextResponse.json({ ok: true, items: prefs });
+  } catch (error: any) {
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, Object.getOwnPropertyNames(error));
+    console.error("Veritabanı Kayıt Hatası (API):", errorMsg);
+    
+    return NextResponse.json(
+      { 
+        ok: false, 
+        message: "Veritabanına kaydedilirken bir hata oluştu.", 
+        details: errorMsg 
+      },
+      { status: 500 }
+    );
+  }
 }
 

@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
-import { approvePreference } from "@/lib/mesaiStore";
+import { processPreference } from "@/lib/mesaiStore";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
     id?: string;
-    isDuty?: boolean;
+    decision?: "approved" | "rejected";
+    feedback?: string;
   };
 
-  if (!body.id) {
+  if (!body.id || !body.decision) {
     return NextResponse.json(
-      { ok: false, message: "Geçersiz istek." },
+      { ok: false, message: "Geçersiz istek. ID ve karar (decision) zorunludur." },
       { status: 400 }
     );
   }
 
-  const updated = approvePreference(body.id, Boolean(body.isDuty));
+  const updated = await processPreference(body.id, body.decision, body.feedback);
   if (!updated) {
     return NextResponse.json(
-      { ok: false, message: "Kayıt bulunamadı." },
+      { ok: false, message: "Kayıt bulunamadı veya güncellenemedi." },
       { status: 404 }
     );
   }

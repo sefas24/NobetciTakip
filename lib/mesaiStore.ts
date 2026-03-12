@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 
 export type MesaiSlot = string;
-export type MesaiPreferenceStatus = "pending" | "approved";
+export type MesaiPreferenceStatus = "pending" | "approved" | "rejected";
 
 export interface MesaiPreference {
   id: string;
@@ -9,6 +9,8 @@ export interface MesaiPreference {
   slots: MesaiSlot[];
   status: MesaiPreferenceStatus;
   dutySlots: string[];
+  feedback?: string;
+  image_url?: string;
 }
 
 export async function addPreference(email: string, slots: MesaiSlot[]): Promise<MesaiPreference> {
@@ -18,7 +20,10 @@ export async function addPreference(email: string, slots: MesaiSlot[]): Promise<
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("Supabase Insert Error (addPreference):", error);
+    throw error;
+  }
 
   return {
     id: data.id,
@@ -26,6 +31,8 @@ export async function addPreference(email: string, slots: MesaiSlot[]): Promise<
     slots: data.slots,
     status: data.status,
     dutySlots: data.duty_slots,
+    feedback: data.feedback,
+    image_url: data.image_url,
   };
 }
 
@@ -43,6 +50,8 @@ export async function listPreferences(): Promise<MesaiPreference[]> {
     slots: p.slots,
     status: p.status,
     dutySlots: p.duty_slots,
+    feedback: p.feedback,
+    image_url: p.image_url,
   }));
 }
 
@@ -61,12 +70,41 @@ export async function listApproved(): Promise<MesaiPreference[]> {
     slots: p.slots,
     status: p.status,
     dutySlots: p.duty_slots,
+    feedback: p.feedback,
+    image_url: p.image_url,
   }));
 }
 
-// Admin manuel nöbetçi iptal/onayı UI'dan kaldırıldı, bu metod referans olarak boşa döndürüldü
-export async function approvePreference(id: string, isDuty: boolean): Promise<MesaiPreference | null> {
-  return null;
+// Tekil Onay / Red Mantığı
+export async function processPreference(
+  id: string,
+  decision: "approved" | "rejected",
+  feedback?: string
+): Promise<MesaiPreference | null> {
+  
+  const updatePayload: any = { status: decision };
+  if (feedback !== undefined) {
+    updatePayload.feedback = feedback;
+  }
+
+  const { data, error } = await supabase
+    .from("mesai_preferences")
+    .update(updatePayload)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    id: data.id,
+    email: data.email,
+    slots: data.slots,
+    status: data.status,
+    dutySlots: data.duty_slots,
+    feedback: data.feedback,
+    image_url: data.image_url,
+  };
 }
 
 // 3. Madde: Otomatik Nöbetçi Seçimi (Her slot/gün için 3 kişi, en az nöbet tutan öncelikli)

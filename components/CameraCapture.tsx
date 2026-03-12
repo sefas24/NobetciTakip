@@ -1,155 +1,285 @@
-'use client';
-import { useState, useRef, useEffect } from 'react';
+"use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 
-// Bu bileşeni çağırdığın yerde (parent component) yakalanan resmi almak için:
-interface CameraCaptureProps {
-  onCapture?: (file: File | string) => void; 
-}
+export default function CameraCapture() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-export default function CameraCapture({ onCapture }: CameraCaptureProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [image, setImage] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoFilename, setPhotoFilename] = useState<string>("nobet-kanit.jpg");
+  const [uploading, setUploading] = useState(false);
 
-  // Kamerayı Başlat
-  const startCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' }
-      });
-      
-      setStream(mediaStream); // Sadece state'e atıp bırakıyoruz
-      setError(null);
-    } catch (err) {
-      setError("Kameraya erişilemedi. İzinleri kontrol et.");
-      console.error(err);
-    }
-  };
-  // Kamerayı Durdur (Stream'i kapat)
-  const stopCamera = () => {
+  const isSecureContextHint = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    if (window.isSecureContext) return null;
+    return "Kamera için HTTPS gerekir. (Localhost hariç) Uygulamayı HTTPS üzerinde açmayı deneyin.";
+  }, []);
+
+  const stopCamera = async () => {
+    const stream = streamRef.current;
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+      stream.getTracks().forEach((t) => t.stop());
     }
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setRunning(false);
   };
 
-  // Fotoğrafı Çek
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Canvas boyutunu videoya eşitle
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const context = canvas.getContext('2d');
-      if (context) {
-        // Videodaki kareyi canvas'a çiz
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Base64 formatına çevir
-        const dataUrl = canvas.toDataURL('image/png');
-        setImage(dataUrl);
-        
-        // Üst bileşene (Parent) veriyi gönder
-        if (onCapture) {
-            onCapture(dataUrl);
-        }
+  const startCamera = async () => {
+    setError(null);
+    setPhotoDataUrl(null);
 
-        stopCamera(); // Çektikten sonra kamerayı kapat
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setError("Bu cihaz/tarayıcı kamera erişimini desteklemiyor.");
+      return;
+    }
+
+    try {
+      await stopCamera();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
+      setRunning(true);
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "Kameraya erişilemedi. İzin verdiğinizden emin olun.";
+      setError(msg);
+      setRunning(false);
     }
   };
 
-  // Yeniden Çek (Reset)
-  const retakePhoto = () => {
-    setImage(null);
-    startCamera(); // İstersen otomatik tekrar başlat
+  const takePhoto = () => {
+    setError(null);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    setPhotoDataUrl(dataUrl);
+    const stamp = new Date()
+      .toISOString()
+      .replaceAll(":", "-")
+      .replaceAll(".", "-");
+    setPhotoFilename(`nobet-kanit-${stamp}.jpg`);
   };
 
-  // Component kapanırken kamerayı temizle (Memory leak önleme)
   useEffect(() => {
-  // Eğer stream varsa ve video etiketi ekrana geldiyse bağla!
-  if (videoRef.current && stream) {
-    videoRef.current.srcObject = stream;
-  }
-  }, [stream]); // stream her değiştiğinde bu kodu tetikle
+    return () => {
+      void stopCamera();
+    };
+  }, []);
+
+  // --- Photo Upload Flow (Phase 7) ---
+
+  const validateFile = (file: File) => {
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Lütfen sadece JPEG, PNG veya WEBP türünde bir resim seçin.");
+      return false;
+    }
+
+    const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSizeInBytes) {
+      toast.error("Dosya boyutu 5MB'den büyük olamaz.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleFileUploadMenu = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!validateFile(file)) {
+      e.target.value = ""; // Formu sıfırla
+      return;
+    }
+
+    await uploadFileToSupabase(file);
+    e.target.value = ""; // Formu sıfırla
+  };
+
+  // Convert canvas Base64 Data URL to a native File object and upload it
+  const handleUploadCapturedPhoto = async () => {
+    if (!photoDataUrl) return;
+
+    try {
+      // Decode base64 to Blob -> File
+      const res = await fetch(photoDataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], photoFilename, { type: "image/jpeg" });
+      
+      await uploadFileToSupabase(file);
+    } catch (err: any) {
+      toast.error("Kamera fotoğrafı dönüştürülürken hata oluştu.");
+    }
+  };
+
+  const uploadFileToSupabase = async (file: File) => {
+    setUploading(true);
+    const loadingToast = toast.loading("Fotoğraf yükleniyor...");
+
+    try {
+      // 1. Create FormData because we are sending a file buffer to our Next.js API route
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // 2. Call the server action / API route (to keep Supabase keys hidden and session secure)
+      const res = await fetch("/api/mesai/upload-proof", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || "Fotoğraf yüklenemedi.");
+      }
+
+      toast.success("Fotoğraf başarıyla nöbet kaydınıza eklendi!", { id: loadingToast });
+      setPhotoDataUrl(null); // Başarılıysa önizlemeyi kapatabiliriz
+      
+    } catch (err: any) {
+      toast.error(err.message || "Bilinmeyen bir hata oluştu.", { id: loadingToast });
+    } finally {
+      setUploading(false);
+    }
+  };
+
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4 border rounded-xl bg-white shadow-sm w-full">
-      <h2 className="text-xl font-bold text-gray-800">Nöbet Kanıt Ekranı</h2>
-      
-      {/* Hata Mesajı */}
-      {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
+    <div className="space-y-4 w-full">
+      {isSecureContextHint ? (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {isSecureContextHint}
+        </p>
+      ) : null}
 
-      {/* Görüntü Alanı */}
-      <div className="aspect-video bg-black rounded-md overflow-hidden flex items-center justify-center">
-        {!image ? (
-          /* Kamera Modu */
-          !stream ? (
-            /* Kamera Kapalıyken */
-            <div className="flex flex-col items-center justify-center text-gray-400">
-               <p className="mb-2">Kamera kapalı</p>
-               <button 
-                 onClick={startCamera}
-                 className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-               >
-                 Kamerayı Başlat
-               </button>
+      {error ? (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="aspect-video bg-black flex items-center justify-center relative">
+          <video
+            ref={videoRef}
+            className="w-full h-full object-contain"
+            playsInline
+            muted
+            autoPlay
+          />
+          {!running && !photoDataUrl && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+              Kamera Kapalı
             </div>
-          ) : (
-            /* Kamera Açıkken (Video) */
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              // w-full'un yanına şunları ekledik:
-              className="w-full aspect-video object-cover rounded-md"
-            />
-          )
-        ) : (
-          /* Çekilen Fotoğraf Modu */
-          <img src={image} alt="Kanıt" className="w-full h-full object-cover" />
-        )}
-      </div>
-
-      {/* Kontrol Butonları */}
-      <div className="flex gap-3">
-        {stream && !image && (
-          <button
-            onClick={capturePhoto}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
-          >
-            Fotoğrafı Çek
-          </button>
-        )}
+          )}
+        </div>
         
-        {stream && !image && (
+        <div className="p-4 flex flex-col sm:flex-row flex-wrap gap-2 justify-between items-center sm:items-start border-b border-gray-100">
+           <div className="flex gap-2 flex-wrap">
              <button
-             onClick={stopCamera}
-             className="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600"
-           >
-             Vazgeç
-           </button>
-        )}
-
-        {image && (
-          <button
-            onClick={retakePhoto}
-            className="px-6 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700"
-          >
-            Yeniden Çek
-          </button>
-        )}
+               onClick={startCamera}
+               disabled={uploading}
+               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+             >
+               Kamerayı Aç
+             </button>
+             <button
+               onClick={stopCamera}
+               disabled={uploading}
+               className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:border-gray-300 transition disabled:opacity-50"
+             >
+               Kamerayı Kapat
+             </button>
+             <button
+               onClick={takePhoto}
+               disabled={!running || uploading}
+               className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                 running && !uploading
+                   ? "bg-gray-900 text-white hover:bg-gray-800"
+                   : "bg-gray-200 text-gray-500 cursor-not-allowed"
+               }`}
+             >
+               Fotoğraf Çek
+             </button>
+           </div>
+        </div>
+        
+        {/* GALERİDEN VEYA DOSYA SİSTEMİNDEN YÜKLE */}
+        <div className="p-4 bg-gray-50 flex flex-col gap-2">
+           <p className="text-xs font-semibold text-gray-600">Veya galerinizden/cihazınızdan kanıt seçin:</p>
+           <input 
+             type="file" 
+             accept="image/jpeg, image/png, image/webp" 
+             onChange={handleFileUploadMenu}
+             disabled={uploading}
+             className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer disabled:opacity-50"
+           />
+        </div>
       </div>
 
-      {/* Gizli Canvas (Görüntü işleme için gerekli) */}
+      {photoDataUrl ? (
+        <div className="bg-white border text-center border-gray-200 rounded-2xl p-4 shadow-sm space-y-3">
+          <h2 className="text-sm font-semibold text-gray-900 text-left">Çekilen Önizleme</h2>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoDataUrl}
+            alt="Çekilen fotoğraf"
+            className="w-full rounded-xl border border-gray-100 max-h-96 object-contain bg-gray-50"
+          />
+          <div className="flex flex-wrap gap-2 justify-center pt-2">
+            <a
+              href={photoDataUrl}
+              download={photoFilename}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
+            >
+              Cihaza İndir
+            </a>
+            
+            <button
+               // Directly upload the taken photo to DB
+               onClick={handleUploadCapturedPhoto}
+               disabled={uploading}
+               className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50"
+             >
+               {uploading ? "Yükleniyor..." : "Sisteme Kanıt Olarak Yükle"}
+             </button>
+          </div>
+        </div>
+      ) : null}
+
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
