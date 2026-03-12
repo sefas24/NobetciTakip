@@ -14,23 +14,13 @@ export async function POST(req: Request) {
     const email = body.email || (role === "admin" ? "admin@test.com" : "student@test.com");
     const password = body.password ?? "";
 
-    // Lokal test için geçici bypass işlemi
-    const isLocalTest = true;
-    let result: { ok: boolean, email: string, role: UserRole, needsPasswordChange?: boolean, message?: string };
-
-    if (isLocalTest) {
-      result = { ok: true, email, role: role as UserRole, needsPasswordChange: false };
-    } else {
-      const authResult = await validateLogin({ role, email, password });
-      if (!authResult.ok) {
+    const authResult = await validateLogin({ role, email, password });
+    if (!authResult.ok) {
         return NextResponse.json({ ok: false, message: authResult.message }, { status: 401 });
-      }
-      result = authResult as any;
     }
 
     const cookieStore = await cookies();
 
-    // Cookie ayarlarında gereksiz zorlamaları kaldırdık ama güvenliği node ortamına göre ayarlıyoruz
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -40,14 +30,23 @@ export async function POST(req: Request) {
     };
 
     cookieStore.set("nt_session", "1", cookieOptions);
-    cookieStore.set("nt_role", result.role, cookieOptions);
-    cookieStore.set("nt_email", result.email, cookieOptions);
+    cookieStore.set("nt_role", authResult.role, cookieOptions);
+    cookieStore.set("nt_email", authResult.email, cookieOptions);
+    
+    // Ad-Soyad varsa kaydet
+    if (authResult.full_name) {
+       cookieStore.set("nt_full_name", authResult.full_name, cookieOptions);
+    } else {
+       // Yoksa veya null gelirse eski cookieyi temizle (Güvenlik için)
+       cookieStore.delete("nt_full_name");
+    }
 
     return NextResponse.json({
       ok: true,
-      email: result.email,
-      role: result.role,
-      needsPasswordChange: result.needsPasswordChange
+      email: authResult.email,
+      role: authResult.role,
+      name: authResult.full_name,
+      needsPasswordChange: authResult.needsPasswordChange
     });
   } catch {
     return NextResponse.json(

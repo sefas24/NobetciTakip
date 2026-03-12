@@ -56,11 +56,11 @@ export default function MesaiPreferencesPanel() {
         body: JSON.stringify({ id, decision: "approved" }),
       });
       const data = await res.json();
-      
+
       if (!res.ok) throw new Error(data.message || "Onay sırasında hata oluştu.");
-      
+
       toast.success("Mesai başarıyla onaylandı!", { id: loadingToast });
-      
+
       // Optimistic Update
       setItems(prev => prev.map(item => item.id === id ? { ...item, status: "approved" as const } : item));
     } catch (err: any) {
@@ -85,14 +85,14 @@ export default function MesaiPreferencesPanel() {
         body: JSON.stringify({ id: rejectingId, decision: "rejected", feedback }),
       });
       const data = await res.json();
-      
+
       if (!res.ok) throw new Error(data.message || "Reddetme sırasında hata oluştu.");
-      
+
       toast.success("Mesai reddedildi ve öğrenciye geri bildirim kaydedildi.", { id: loadingToast });
-      
+
       // Optimistic Update
       setItems(prev => prev.map(item => item.id === rejectingId ? { ...item, status: "rejected" as const, feedback } : item));
-      
+
       setRejectingId(null);
       setFeedback("");
     } catch (err: any) {
@@ -210,20 +210,20 @@ export default function MesaiPreferencesPanel() {
                         <span className="font-semibold text-gray-800">Seçilen Günler:</span> {p.slots.join(", ")}
                       </div>
                     </div>
-                    
+
                     <div className="flex gap-2">
-                       <button
-                         onClick={() => setRejectingId(p.id)}
-                         className="px-3 py-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold rounded-md shadow-sm transition"
-                       >
-                         Reddet
-                       </button>
-                       <button
-                         onClick={() => handleApproveSingle(p.id)}
-                         className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md shadow-sm transition"
-                       >
-                         Onayla
-                       </button>
+                      <button
+                        onClick={() => setRejectingId(p.id)}
+                        className="px-3 py-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold rounded-md shadow-sm transition"
+                      >
+                        Reddet
+                      </button>
+                      <button
+                        onClick={() => handleApproveSingle(p.id)}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md shadow-sm transition"
+                      >
+                        Onayla
+                      </button>
                     </div>
                   </div>
                 </li>
@@ -287,34 +287,34 @@ export default function MesaiPreferencesPanel() {
       {rejectingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
-             <div className="p-5">
-               <h3 className="text-lg font-bold text-gray-900 mb-1">Talebi Reddet</h3>
-               <p className="text-xs text-gray-500 mb-4">Öğrenciye bu talebinin neden reddedildiğini açıklayan kısa bir geri bildirim bırakın.</p>
-               
-               <textarea
-                 className="w-full text-sm p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none transition"
-                 rows={4}
-                 placeholder="Örn: Pazartesi günü için kontenjanımız dolmuştur..."
-                 value={feedback}
-                 onChange={(e) => setFeedback(e.target.value)}
-                 autoFocus
-               />
-             </div>
-             
-             <div className="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
-               <button 
-                 onClick={cancelReject}
-                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition"
-               >
-                 İptal
-               </button>
-               <button 
-                 onClick={handleRejectConfirm}
-                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-               >
-                 Reddetmeyi Onayla
-               </button>
-             </div>
+            <div className="p-5">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Talebi Reddet</h3>
+              <p className="text-xs text-gray-500 mb-4">Öğrenciye bu talebinin neden reddedildiğini açıklayan kısa bir geri bildirim bırakın.</p>
+
+              <textarea
+                className="w-full text-sm p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none transition"
+                rows={4}
+                placeholder="Örn: Pazartesi günü için kontenjanımız dolmuştur..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="bg-gray-50 px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+              <button
+                onClick={cancelReject}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleRejectConfirm}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+              >
+                Reddetmeyi Onayla
+              </button>
+            </div>
           </div>
         </div>
       )}
