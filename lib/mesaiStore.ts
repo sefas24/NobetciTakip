@@ -11,6 +11,24 @@ export interface MesaiPreference {
   dutySlots: string[];
   feedback?: string;
   image_url?: string;
+  fullName?: string;
+}
+
+// Ortak fonksiyon: Kullanıcı isimlerini mesai verilerine ekler
+async function attachFullNames(preferencesData: any[]): Promise<MesaiPreference[]> {
+  const { data: users } = await supabase.from("users").select("email, isim_soyisim");
+  const userMap = new Map((users || []).map(u => [u.email, u.isim_soyisim]));
+
+  return preferencesData.map((p) => ({
+    id: p.id,
+    email: p.email,
+    slots: p.slots,
+    status: p.status,
+    dutySlots: p.duty_slots,
+    feedback: p.feedback,
+    image_url: p.image_url,
+    fullName: userMap.get(p.email) || undefined,
+  }));
 }
 
 export async function addPreference(email: string, slots: MesaiSlot[]): Promise<MesaiPreference> {
@@ -25,15 +43,8 @@ export async function addPreference(email: string, slots: MesaiSlot[]): Promise<
     throw error;
   }
 
-  return {
-    id: data.id,
-    email: data.email,
-    slots: data.slots,
-    status: data.status,
-    dutySlots: data.duty_slots,
-    feedback: data.feedback,
-    image_url: data.image_url,
-  };
+  const result = await attachFullNames([data]);
+  return result[0];
 }
 
 export async function listPreferences(): Promise<MesaiPreference[]> {
@@ -42,17 +53,9 @@ export async function listPreferences(): Promise<MesaiPreference[]> {
     .select("*")
     .order("created_at", { ascending: false });
 
-  if (error) return [];
+  if (error || !data) return [];
 
-  return data.map((p) => ({
-    id: p.id,
-    email: p.email,
-    slots: p.slots,
-    status: p.status,
-    dutySlots: p.duty_slots,
-    feedback: p.feedback,
-    image_url: p.image_url,
-  }));
+  return attachFullNames(data);
 }
 
 export async function listApproved(): Promise<MesaiPreference[]> {
@@ -62,17 +65,9 @@ export async function listApproved(): Promise<MesaiPreference[]> {
     .eq("status", "approved")
     .order("created_at", { ascending: false });
 
-  if (error) return [];
+  if (error || !data) return [];
 
-  return data.map((p) => ({
-    id: p.id,
-    email: p.email,
-    slots: p.slots,
-    status: p.status,
-    dutySlots: p.duty_slots,
-    feedback: p.feedback,
-    image_url: p.image_url,
-  }));
+  return attachFullNames(data);
 }
 
 // Tekil Onay / Red Mantığı

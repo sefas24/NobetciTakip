@@ -204,7 +204,7 @@ export default function MesaiPreferencesPanel() {
                   <div className="flex justify-between items-start flex-wrap gap-2">
                     <div>
                       <span className="font-bold text-gray-900 block text-base">
-                        {p.email}
+                        {p.fullName || p.email}
                       </span>
                       <div className="text-xs text-gray-600 mt-1">
                         <span className="font-semibold text-gray-800">Seçilen Günler:</span> {p.slots.join(", ")}
@@ -259,7 +259,7 @@ export default function MesaiPreferencesPanel() {
                   className="border border-green-100 bg-green-50/20 rounded-lg px-3 py-2 flex justify-between items-start"
                 >
                   <div>
-                    <p className="font-semibold text-gray-900">{p.email}</p>
+                    <p className="font-semibold text-gray-900">{p.fullName || p.email}</p>
                     <p className="text-xs text-gray-600 mt-1">
                       <span className="font-semibold">Mesai:</span>{" "}
                       {p.slots.filter(s => !p.dutySlots.includes(s)).join(", ") || "-"}

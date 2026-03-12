@@ -5,10 +5,11 @@ import toast from "react-hot-toast";
 
 interface Props {
   email: string | null;
+  displayName?: string | null;
   slots: string[];
 }
 
-export default function GunSecimiClient({ email, slots }: Props) {
+export default function GunSecimiClient({ email, displayName, slots }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
@@ -62,8 +63,8 @@ export default function GunSecimiClient({ email, slots }: Props) {
           Giriş yapan kullanıcı
         </h2>
         <p className="text-sm text-gray-700">
-          {email ? (
-            <span className="font-semibold">{email}</span>
+          {displayName || email ? (
+            <span className="font-semibold">{displayName || email}</span>
           ) : (
             <span className="text-gray-400">-</span>
           )}

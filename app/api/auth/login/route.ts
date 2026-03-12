@@ -34,18 +34,18 @@ export async function POST(req: Request) {
     cookieStore.set("nt_email", authResult.email, cookieOptions);
     
     // Ad-Soyad varsa kaydet
-    if (authResult.full_name) {
-       cookieStore.set("nt_full_name", authResult.full_name, cookieOptions);
+    if (authResult.isim_soyisim) {
+       cookieStore.set("nt_isim_soyisim", authResult.isim_soyisim, cookieOptions);
     } else {
        // Yoksa veya null gelirse eski cookieyi temizle (Güvenlik için)
-       cookieStore.delete("nt_full_name");
+       cookieStore.delete("nt_isim_soyisim");
     }
 
     return NextResponse.json({
       ok: true,
       email: authResult.email,
       role: authResult.role,
-      name: authResult.full_name,
+      name: authResult.isim_soyisim,
       needsPasswordChange: authResult.needsPasswordChange
     });
   } catch {

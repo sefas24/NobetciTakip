@@ -6,7 +6,7 @@ export async function validateLogin(input: {
   role: UserRole;
   email: string;
   password: string;
-}): Promise<{ ok: true; email: string; role: UserRole; full_name?: string; needsPasswordChange?: boolean } | { ok: false; message: string }> {
+}): Promise<{ ok: true; email: string; role: UserRole; isim_soyisim?: string; needsPasswordChange?: boolean } | { ok: false; message: string }> {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
 
@@ -26,7 +26,7 @@ export async function validateLogin(input: {
     if (!user || user.role !== "admin" || user.password !== password) {
       return { ok: false, message: "Yönetici e-posta veya şifresi hatalı." };
     }
-    return { ok: true, email, role: "admin", full_name: user?.full_name, needsPasswordChange: false };
+    return { ok: true, email, role: "admin", isim_soyisim: user?.isim_soyisim, needsPasswordChange: false };
   } else {
     // Öğrenci Formati: öğrencinumarası@okul.edu.tr vb.
     const [prefix] = email.split("@");
@@ -36,11 +36,11 @@ export async function validateLogin(input: {
       if (user.password !== password) {
         return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
       }
-      return { ok: true, email, role: "student", full_name: user?.full_name, needsPasswordChange: false };
+      return { ok: true, email, role: "student", isim_soyisim: user?.isim_soyisim, needsPasswordChange: false };
     } else {
       // Veritabanında yoksa, daha şifresini belirlememiş ilk giriş yapan öğrencidir.
       if (password === prefix) {
-        return { ok: true, email, role: "student", full_name: user?.full_name, needsPasswordChange: true };
+        return { ok: true, email, role: "student", isim_soyisim: user?.isim_soyisim, needsPasswordChange: true };
       } else {
         return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
       }

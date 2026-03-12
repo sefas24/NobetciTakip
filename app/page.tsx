@@ -8,7 +8,7 @@ export default async function AnaSayfa() {
   const store = await cookies();
   const role = store.get("nt_role")?.value;
   const email = store.get("nt_email")?.value;
-  const fullName = store.get("nt_full_name")?.value;
+  const fullName = store.get("nt_isim_soyisim")?.value;
 
   // Admin giriş yaptıysa direkt admin paneline gitsin.
   // Öğrenci panelinin mobil dashboard versiyonunu kodluyoruz:
@@ -34,15 +34,15 @@ export default async function AnaSayfa() {
   const morningSlot = `${todayName} Öğleden Önce`;
   const afternoonSlot = `${todayName} Öğleden Sonra`;
 
-  const morningDuty = approved.filter(p => p.dutySlots.includes(morningSlot)).map(p => p.email);
-  const morningMesai = approved.filter(p => p.slots.includes(morningSlot) && !p.dutySlots.includes(morningSlot)).map(p => p.email);
+  // KULLANICI BUGÜN NÖBETÇİ Mİ? (Email ile kontrol ediyoruz listeye isim girmeden önce)
+  const isDutyToday = approved.some(p => p.email === email && (p.dutySlots.includes(morningSlot) || p.dutySlots.includes(afternoonSlot)));
 
-  const afternoonDuty = approved.filter(p => p.dutySlots.includes(afternoonSlot)).map(p => p.email);
-  const afternoonMesai = approved.filter(p => p.slots.includes(afternoonSlot) && !p.dutySlots.includes(afternoonSlot)).map(p => p.email);
+  // Listede görünecek isimleri belirle (Ad-Soyad varsa onu kullan, yoksa mecburen mailini göster)
+  const morningDuty = approved.filter(p => p.dutySlots.includes(morningSlot)).map(p => p.fullName || p.email);
+  const morningMesai = approved.filter(p => p.slots.includes(morningSlot) && !p.dutySlots.includes(morningSlot)).map(p => p.fullName || p.email);
 
-  // KULLANICI BUGÜN NÖBETÇİ Mİ?
-  // Hem sabah hem akşam listelerinde arıyoruz.
-  const isDutyToday = morningDuty.includes(email!) || afternoonDuty.includes(email!);
+  const afternoonDuty = approved.filter(p => p.dutySlots.includes(afternoonSlot)).map(p => p.fullName || p.email);
+  const afternoonMesai = approved.filter(p => p.slots.includes(afternoonSlot) && !p.dutySlots.includes(afternoonSlot)).map(p => p.fullName || p.email);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -61,7 +61,7 @@ export default async function AnaSayfa() {
         {/* Karşılama ve Uyarı Afişi */}
         <div className="mb-2">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">
-            Merhaba, {displayName.split(" ")[0]} 👋
+            Merhaba, {displayName} 👋
           </h1>
           <p className="text-sm text-slate-500">Bugünkü çalışma durumun ve ofis programı.</p>
         </div>
