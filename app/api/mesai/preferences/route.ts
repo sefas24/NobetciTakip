@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json()) as { slots?: MesaiSlot[] };
+  const body = (await req.json()) as { slots?: MesaiSlot[], note?: string, schedule_file_url?: string };
   const slots = body.slots ?? [];
 
   if (!Array.isArray(slots) || slots.length === 0) {
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const prefs = await addPreference(email, slots);
+    const prefs = await addPreference(email, slots, body.note, body.schedule_file_url);
     return NextResponse.json({ ok: true, items: prefs });
   } catch (error: any) {
     const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, Object.getOwnPropertyNames(error));

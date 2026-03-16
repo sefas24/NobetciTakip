@@ -138,7 +138,7 @@ export default function CameraCapture() {
       const res = await fetch(photoDataUrl);
       const blob = await res.blob();
       const file = new File([blob], photoFilename, { type: "image/jpeg" });
-      
+
       await uploadFileToSupabase(file);
     } catch (err: any) {
       toast.error("Kamera fotoğrafı dönüştürülürken hata oluştu.");
@@ -168,7 +168,7 @@ export default function CameraCapture() {
 
       toast.success("Fotoğraf başarıyla nöbet kaydınıza eklendi!", { id: loadingToast });
       setPhotoDataUrl(null); // Başarılıysa önizlemeyi kapatabiliriz
-      
+
     } catch (err: any) {
       toast.error(err.message || "Bilinmeyen bir hata oluştu.", { id: loadingToast });
     } finally {
@@ -206,48 +206,38 @@ export default function CameraCapture() {
             </div>
           )}
         </div>
-        
+
         <div className="p-4 flex flex-col sm:flex-row flex-wrap gap-2 justify-between items-center sm:items-start border-b border-gray-100">
-           <div className="flex gap-2 flex-wrap">
-             <button
-               onClick={startCamera}
-               disabled={uploading}
-               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-             >
-               Kamerayı Aç
-             </button>
-             <button
-               onClick={stopCamera}
-               disabled={uploading}
-               className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:border-gray-300 transition disabled:opacity-50"
-             >
-               Kamerayı Kapat
-             </button>
-             <button
-               onClick={takePhoto}
-               disabled={!running || uploading}
-               className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                 running && !uploading
-                   ? "bg-gray-900 text-white hover:bg-gray-800"
-                   : "bg-gray-200 text-gray-500 cursor-not-allowed"
-               }`}
-             >
-               Fotoğraf Çek
-             </button>
-           </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={startCamera}
+              disabled={uploading}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              Kamerayı Aç
+            </button>
+            <button
+              onClick={stopCamera}
+              disabled={uploading}
+              className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:border-gray-300 transition disabled:opacity-50"
+            >
+              Kamerayı Kapat
+            </button>
+            <button
+              onClick={takePhoto}
+              disabled={!running || uploading}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${running && !uploading
+                  ? "bg-gray-900 text-white hover:bg-gray-800"
+                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                }`}
+            >
+              Fotoğraf Çek
+            </button>
+          </div>
         </div>
-        
+
         {/* GALERİDEN VEYA DOSYA SİSTEMİNDEN YÜKLE */}
-        <div className="p-4 bg-gray-50 flex flex-col gap-2">
-           <p className="text-xs font-semibold text-gray-600">Veya galerinizden/cihazınızdan kanıt seçin:</p>
-           <input 
-             type="file" 
-             accept="image/jpeg, image/png, image/webp" 
-             onChange={handleFileUploadMenu}
-             disabled={uploading}
-             className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer disabled:opacity-50"
-           />
-        </div>
+
       </div>
 
       {photoDataUrl ? (
@@ -267,15 +257,15 @@ export default function CameraCapture() {
             >
               Cihaza İndir
             </a>
-            
+
             <button
-               // Directly upload the taken photo to DB
-               onClick={handleUploadCapturedPhoto}
-               disabled={uploading}
-               className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50"
-             >
-               {uploading ? "Yükleniyor..." : "Sisteme Kanıt Olarak Yükle"}
-             </button>
+              // Directly upload the taken photo to DB
+              onClick={handleUploadCapturedPhoto}
+              disabled={uploading}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50"
+            >
+              {uploading ? "Yükleniyor..." : "Sisteme Kanıt Olarak Yükle"}
+            </button>
           </div>
         </div>
       ) : null}

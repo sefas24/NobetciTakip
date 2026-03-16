@@ -209,6 +209,17 @@ export default function MesaiPreferencesPanel() {
                       <div className="text-xs text-gray-600 mt-1">
                         <span className="font-semibold text-gray-800">Seçilen Günler:</span> {p.slots.join(", ")}
                       </div>
+                      {p.note && (
+                        <div className="mt-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-md p-2">
+                          <span className="font-bold">Öğrencinin Notu:</span> {p.note}
+                        </div>
+                      )}
+                      {p.schedule_file_url && (
+                        <a href={p.schedule_file_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                          <span>Ders Programını İncele</span>
+                        </a>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -269,11 +280,21 @@ export default function MesaiPreferencesPanel() {
                         Nöbetçi: {p.dutySlots.join(", ")}
                       </p>
                     )}
-                    {p.image_url && (
-                      <a href={p.image_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        <span>Kanıtı Gör</span>
+                    {p.schedule_file_url && (
+                      <a href={p.schedule_file_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                        <span>Ders Programı</span>
                       </a>
+                    )}
+                    {p.image_url && (
+                      <div className="mt-2 space-y-1">
+                        {p.image_url.split(",").map((url, i, arr) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            <span>Kanıtı Gör {arr.length > 1 ? i + 1 : ""}</span>
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </li>

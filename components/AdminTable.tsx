@@ -93,10 +93,14 @@ export default function AdminTable({ shifts, filter, onFilterChange }: AdminTabl
               </td>
               <td className="p-4 border-b text-center">
                 {shift.photoUrl ? (
-                  <a href={shift.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium underline flex items-center justify-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    <span>Fotoğrafı Gör</span>
-                  </a>
+                  <div className="flex flex-col gap-2 items-center">
+                    {shift.photoUrl.split(",").map((url, i, arr) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium underline flex items-center justify-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span className="text-xs">Fotoğrafı Gör {arr.length > 1 ? i + 1 : ""}</span>
+                      </a>
+                    ))}
+                  </div>
                 ) : (
                   <span className="text-gray-400">-</span>
                 )}

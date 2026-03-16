@@ -12,6 +12,8 @@ export interface MesaiPreference {
   feedback?: string;
   image_url?: string;
   fullName?: string;
+  note?: string;
+  schedule_file_url?: string;
 }
 
 // Ortak fonksiyon: Kullanıcı isimlerini mesai verilerine ekler
@@ -28,13 +30,27 @@ async function attachFullNames(preferencesData: any[]): Promise<MesaiPreference[
     feedback: p.feedback,
     image_url: p.image_url,
     fullName: userMap.get(p.email) || undefined,
+    note: p.note,
+    schedule_file_url: p.schedule_file_url,
   }));
 }
 
-export async function addPreference(email: string, slots: MesaiSlot[]): Promise<MesaiPreference> {
+export async function addPreference(
+  email: string,
+  slots: MesaiSlot[],
+  note?: string,
+  scheduleFileUrl?: string
+): Promise<MesaiPreference> {
   const { data, error } = await supabase
     .from("mesai_preferences")
-    .insert({ email, slots, status: "pending", duty_slots: [] })
+    .insert({
+      email,
+      slots,
+      status: "pending",
+      duty_slots: [],
+      note: note || null,
+      schedule_file_url: scheduleFileUrl || null,
+    })
     .select()
     .single();
 
@@ -91,6 +107,16 @@ export async function processPreference(
 
   if (error || !data) return null;
 
+  // İSTEK: Onaylama gerçekleştiyse, bu kişinin diğer eski 'approved' kayıtlarını temizle
+  if (decision === "approved") {
+    await supabase
+      .from("mesai_preferences")
+      .delete()
+      .eq("email", data.email)
+      .eq("status", "approved")
+      .neq("id", data.id); // Kendisini (yeni onaylananı) silme
+  }
+
   return {
     id: data.id,
     email: data.email,
@@ -99,6 +125,8 @@ export async function processPreference(
     dutySlots: data.duty_slots,
     feedback: data.feedback,
     image_url: data.image_url,
+    note: data.note,
+    schedule_file_url: data.schedule_file_url,
   };
 }
 
@@ -189,7 +217,17 @@ export async function approveAllWithAutomaticDuty(): Promise<{ successCount: num
       .update({ status: "approved", duty_slots: pref.dutySlots })
       .eq("id", pref.id);
 
-    if (!error) successCount++;
+    if (!error) {
+      successCount++;
+      
+      // İSTEK: Çoklu onamada da kişinin diğer eski onaylanmış kayıtlarını sil (kendi yeni onaylanan kaydı hariç)
+      await supabase
+        .from("mesai_preferences")
+        .delete()
+        .eq("email", pref.email)
+        .eq("status", "approved")
+        .neq("id", pref.id);
+    }
   }
 
   return { successCount, errorCount: pending.length - successCount };

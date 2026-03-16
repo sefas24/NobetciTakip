@@ -17,7 +17,7 @@ export async function validateLogin(input: {
   // Supabase'den kullanıcı sorgula
   const { data: user } = await supabase
     .from("users")
-    .select("*")
+    .select("*, is_password_changed")
     .eq("email", email)
     .maybeSingle();
 
@@ -28,23 +28,21 @@ export async function validateLogin(input: {
     }
     return { ok: true, email, role: "admin", isim_soyisim: user?.isim_soyisim, needsPasswordChange: false };
   } else {
-    // Öğrenci Formati: öğrencinumarası@okul.edu.tr vb.
-    const [prefix] = email.split("@");
-
-    if (user) {
-      // Daha önceden şifresini belirleyip DB'ye kaydedilmiş öğrenci
-      if (user.password !== password) {
-        return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
-      }
-      return { ok: true, email, role: "student", isim_soyisim: user?.isim_soyisim, needsPasswordChange: false };
-    } else {
-      // Veritabanında yoksa, daha şifresini belirlememiş ilk giriş yapan öğrencidir.
-      if (password === prefix) {
-        return { ok: true, email, role: "student", isim_soyisim: user?.isim_soyisim, needsPasswordChange: true };
-      } else {
-        return { ok: false, message: "Öğrenci numarası (şifre) veya e-posta hatalı." };
-      }
+    // Öğrenci Rolü
+    if (!user) {
+      return { ok: false, message: "Kullanıcı bulunamadı. Lütfen yöneticinizle iletişime geçin." };
     }
+
+    if (user.password !== password) {
+      return { ok: false, message: "E-posta veya şifre hatalı." };
+    }
+
+    // Şifre doğruysa is_password_changed alanını kontrol et
+    if (!user.is_password_changed) {
+      return { ok: true, email, role: "student", isim_soyisim: user.isim_soyisim, needsPasswordChange: true };
+    }
+
+    return { ok: true, email, role: "student", isim_soyisim: user.isim_soyisim, needsPasswordChange: false };
   }
 }
 
@@ -58,14 +56,18 @@ export async function updateStudentPassword(email: string, newPassword: string) 
     .maybeSingle();
 
   if (user) {
-    // Varsa güncelle
-    await supabase.from("users").update({ password: newPassword }).eq("email", normalizedEmail);
+    // Varsa güncelle ve is_password_changed durumunu true yap
+    await supabase
+      .from("users")
+      .update({ password: newPassword, is_password_changed: true })
+      .eq("email", normalizedEmail);
   } else {
-    // Yoksa (ilk defa belirliyorsa) ekle
+    // Ekstrem Durum: Yoksa DB'ye yeni bir ekleme yapar (aslında admin'in önceden eklemiş olması beklenir)
     await supabase.from("users").insert({
       email: normalizedEmail,
       password: newPassword,
-      role: "student"
+      role: "student",
+      is_password_changed: true,
     });
   }
 }

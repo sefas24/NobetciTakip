@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     // Not: "En son onaylanan" kaydı bulup ona attach edelim.
     const { data: latestApprovedPref, error: fetchError } = await supabase
       .from("mesai_preferences")
-      .select("id")
+      .select("id, image_url")
       .eq("email", email)
       .eq("status", "approved")
       .order("created_at", { ascending: false })
@@ -79,9 +79,15 @@ export async function POST(req: Request) {
     }
 
     // Güncelleme İşlemi (image_url) sütunu
+    // İSTEK: Çoklu fotoğraf yüklemelerinde eskileri ezme, yan yana virgülle kaydet.
+    let newImageUrl = publicUrl;
+    if (latestApprovedPref.image_url) {
+      newImageUrl = `${latestApprovedPref.image_url},${publicUrl}`;
+    }
+
     const { error: dbUpdateError } = await supabase
       .from("mesai_preferences")
-      .update({ image_url: publicUrl })
+      .update({ image_url: newImageUrl })
       .eq("id", latestApprovedPref.id);
 
     if (dbUpdateError) {
