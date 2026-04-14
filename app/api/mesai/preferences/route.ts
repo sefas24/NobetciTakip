@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import {
   addPreference,
   listPreferences,
-  type MesaiSlot,
 } from "@/lib/mesaiStore";
+import type { MesaiSlot } from "@/types";
 
 export async function GET() {
   const all = await listPreferences();
@@ -49,4 +49,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

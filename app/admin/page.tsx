@@ -5,6 +5,7 @@ import Link from "next/link";
 import MesaiPreferencesPanel from "./MesaiPreferencesPanel";
 import AdminTable, { DashboardShift } from "@/components/AdminTable";
 import { listApproved } from "@/lib/mesaiStore";
+import type { ShiftStatus } from "@/types";
 
 export default function AdminDashboard() {
   const [filter, setFilter] = useState("all"); // all, completed, pending
@@ -21,7 +22,7 @@ export default function AdminDashboard() {
         date: "Sürekli", // Mevcut sistemde spesifik gün yok, "slots" kullanılıyor
         status: "completed", // Onaylandığı için tamamlanmış sayıyoruz (ya da duruma göre ayarlayabiliriz)
         time: pref.dutySlots?.join(", ") || "-", // Adminin atadığı saatler
-        photoUrl: pref.image_url || null,
+        photoUrl: pref.imageUrl || null,
       }));
       setShifts(mappedShifts);
       setLoading(false);

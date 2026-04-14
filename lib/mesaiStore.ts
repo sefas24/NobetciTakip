@@ -1,43 +1,86 @@
+// =============================================================================
+// lib/mesaiStore.ts
+//
+// Supabase ile konuşan tek yer burası.
+// Bu dosya sadece veri okur, yazar, siler — başka hiçbir şey yapmaz.
+// İş mantığı (algoritma) için lib/utils/scheduling.ts'e bakın.
+// =============================================================================
+
 import { supabase } from "./supabase";
+import { computeSchedule } from "./utils/scheduling";
+import type {
+  MesaiPreference,
+  DbMesaiPreference,
+  DbUser,
+  AutoApproveResult,
+} from "@/types";
 
-export type MesaiSlot = string;
-export type MesaiPreferenceStatus = "pending" | "approved" | "rejected";
+// -----------------------------------------------------------------------------
+// YARDIMCI: DB satırını domain tipine çevir
+// -----------------------------------------------------------------------------
 
-export interface MesaiPreference {
-  id: string;
-  email: string;
-  slots: MesaiSlot[];
-  status: MesaiPreferenceStatus;
-  dutySlots: string[];
-  feedback?: string;
-  image_url?: string;
-  fullName?: string;
-  note?: string;
-  schedule_file_url?: string;
+function toMesaiPreference(
+  row: DbMesaiPreference,
+  fullName?: string
+): MesaiPreference {
+  return {
+    id:              row.id,
+    email:           row.email,
+    slots:           row.slots,
+    dutySlots:       row.duty_slots,
+    status:          row.status,
+    feedback:        row.feedback          ?? undefined,
+    imageUrl:        row.image_url         ?? undefined,
+    note:            row.note              ?? undefined,
+    scheduleFileUrl: row.schedule_file_url ?? undefined,
+    fullName,
+  };
 }
 
-// Ortak fonksiyon: Kullanıcı isimlerini mesai verilerine ekler
-async function attachFullNames(preferencesData: any[]): Promise<MesaiPreference[]> {
-  const { data: users } = await supabase.from("users").select("email, isim_soyisim");
-  const userMap = new Map((users || []).map(u => [u.email, u.isim_soyisim]));
+async function withFullNames(rows: DbMesaiPreference[]): Promise<MesaiPreference[]> {
+  const { data: users } = await supabase
+    .from("users")
+    .select("email, isim_soyisim") as { data: Pick<DbUser, "email" | "isim_soyisim">[] | null };
 
-  return preferencesData.map((p) => ({
-    id: p.id,
-    email: p.email,
-    slots: p.slots,
-    status: p.status,
-    dutySlots: p.duty_slots,
-    feedback: p.feedback,
-    image_url: p.image_url,
-    fullName: userMap.get(p.email) || undefined,
-    note: p.note,
-    schedule_file_url: p.schedule_file_url,
-  }));
+  const nameByEmail = new Map(
+    (users ?? []).map((u) => [u.email, u.isim_soyisim ?? undefined])
+  );
+
+  return rows.map((row) => toMesaiPreference(row, nameByEmail.get(row.email)));
 }
+
+// -----------------------------------------------------------------------------
+// OKUMA
+// -----------------------------------------------------------------------------
+
+export async function listPreferences(): Promise<MesaiPreference[]> {
+  const { data, error } = await supabase
+    .from("mesai_preferences")
+    .select("*")
+    .order("created_at", { ascending: false }) as { data: DbMesaiPreference[] | null; error: unknown };
+
+  if (error || !data) return [];
+  return withFullNames(data);
+}
+
+export async function listApproved(): Promise<MesaiPreference[]> {
+  const { data, error } = await supabase
+    .from("mesai_preferences")
+    .select("*")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false }) as { data: DbMesaiPreference[] | null; error: unknown };
+
+  if (error || !data) return [];
+  return withFullNames(data);
+}
+
+// -----------------------------------------------------------------------------
+// YAZMA
+// -----------------------------------------------------------------------------
 
 export async function addPreference(
   email: string,
-  slots: MesaiSlot[],
+  slots: string[],
   note?: string,
   scheduleFileUrl?: string
 ): Promise<MesaiPreference> {
@@ -48,194 +91,111 @@ export async function addPreference(
       slots,
       status: "pending",
       duty_slots: [],
-      note: note || null,
-      schedule_file_url: scheduleFileUrl || null,
+      note: note ?? null,
+      schedule_file_url: scheduleFileUrl ?? null,
     })
     .select()
-    .single();
+    .single() as { data: DbMesaiPreference | null; error: unknown };
 
-  if (error) {
-    console.error("Supabase Insert Error (addPreference):", error);
+  if (error || !data) {
+    console.error("addPreference hatası:", error);
     throw error;
   }
 
-  const result = await attachFullNames([data]);
-  return result[0];
+  return toMesaiPreference(data);
 }
 
-export async function listPreferences(): Promise<MesaiPreference[]> {
-  const { data, error } = await supabase
-    .from("mesai_preferences")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error || !data) return [];
-
-  return attachFullNames(data);
-}
-
-export async function listApproved(): Promise<MesaiPreference[]> {
-  const { data, error } = await supabase
-    .from("mesai_preferences")
-    .select("*")
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
-
-  if (error || !data) return [];
-
-  return attachFullNames(data);
-}
-
-// Tekil Onay / Red Mantığı
 export async function processPreference(
   id: string,
   decision: "approved" | "rejected",
   feedback?: string
 ): Promise<MesaiPreference | null> {
-  
-  const updatePayload: any = { status: decision };
-  if (feedback !== undefined) {
-    updatePayload.feedback = feedback;
-  }
+  const payload: Partial<DbMesaiPreference> = { status: decision };
+  if (feedback !== undefined) payload.feedback = feedback;
 
   const { data, error } = await supabase
     .from("mesai_preferences")
-    .update(updatePayload)
+    .update(payload)
     .eq("id", id)
     .select()
-    .single();
+    .single() as { data: DbMesaiPreference | null; error: unknown };
 
   if (error || !data) return null;
 
-  // İSTEK: Onaylama gerçekleştiyse, bu kişinin diğer eski 'approved' kayıtlarını temizle
   if (decision === "approved") {
     await supabase
       .from("mesai_preferences")
       .delete()
       .eq("email", data.email)
       .eq("status", "approved")
-      .neq("id", data.id); // Kendisini (yeni onaylananı) silme
+      .neq("id", data.id);
   }
 
-  return {
-    id: data.id,
-    email: data.email,
-    slots: data.slots,
-    status: data.status,
-    dutySlots: data.duty_slots,
-    feedback: data.feedback,
-    image_url: data.image_url,
-    note: data.note,
-    schedule_file_url: data.schedule_file_url,
-  };
+  return toMesaiPreference(data);
 }
 
-// 3. Madde: Otomatik Nöbetçi Seçimi (Her slot/gün için 3 kişi, en az nöbet tutan öncelikli)
-export async function approveAllWithAutomaticDuty(): Promise<{ successCount: number; errorCount: number }> {
-  const { data: pendingData } = await supabase
+// -----------------------------------------------------------------------------
+// OTOMATİK NÖBET ATAMA
+// -----------------------------------------------------------------------------
+
+export async function approveAllWithAutomaticDuty(): Promise<AutoApproveResult> {
+  const { data: pendingRows } = await supabase
     .from("mesai_preferences")
     .select("*")
-    .eq("status", "pending");
+    .eq("status", "pending") as { data: DbMesaiPreference[] | null };
 
-  if (!pendingData || pendingData.length === 0) return { successCount: 0, errorCount: 0 };
+  if (!pendingRows || pendingRows.length === 0) {
+    return { successCount: 0, errorCount: 0 };
+  }
 
-  const pending: MesaiPreference[] = pendingData.map(p => ({
-    id: p.id,
-    email: p.email,
-    slots: p.slots,
-    status: p.status,
-    dutySlots: p.duty_slots,
-  }));
-
-  // Sistemin bugüne kadar kimin kaç kere nöbet tuttuğunu bilmesi için
-  const dutyCounts = new Map<string, number>();
-
-  const { data: approvedData } = await supabase
+  const { data: approvedRows } = await supabase
     .from("mesai_preferences")
     .select("email, duty_slots")
-    .eq("status", "approved");
+    .eq("status", "approved") as { data: Pick<DbMesaiPreference, "email" | "duty_slots">[] | null };
 
-  (approvedData || []).forEach(p => {
-    dutyCounts.set(p.email, (dutyCounts.get(p.email) || 0) + (p.duty_slots?.length || 0));
+  const dutyCounts = new Map<string, number>();
+  (approvedRows ?? []).forEach((row) => {
+    dutyCounts.set(row.email, (dutyCounts.get(row.email) ?? 0) + (row.duty_slots?.length ?? 0));
   });
 
-  // 1. Yeni Yaklaşım: Günleri ayrıştır
-  const allDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+  const candidates = pendingRows.map((row) => ({
+    id:        row.id,
+    email:     row.email,
+    slots:     row.slots,
+    dutySlots: row.duty_slots ?? [],
+  }));
 
-  for (const day of allDays) {
-    const morningSlot = `${day} Öğleden Önce`;
-    const afternoonSlot = `${day} Öğleden Sonra`;
+  const { assignments } = computeSchedule(candidates, dutyCounts);
 
-    // Adayları belirle
-    const candidates = pending.filter(p => p.slots.includes(morningSlot) || p.slots.includes(afternoonSlot));
-    if (candidates.length === 0) continue;
-
-    // Adayları önceki nöbetçi sayısına göre azdan çoğa sırala
-    candidates.sort((a, b) => {
-      const countA = dutyCounts.get(a.email) || 0;
-      const countB = dutyCounts.get(b.email) || 0;
-      return countA - countB;
-    });
-
-    let assignedThisDay = 0;
-
-    // ADIM A: "Tüm Gün" mesaisi olanları ÖNCELİKLİ ve Kesin Nöbetçi Yap (haftalık kotayı dolmamışsa)
-    for (const pref of candidates) {
-      if (assignedThisDay >= 3) break;
-
-      const isFullDay = pref.slots.includes(morningSlot) && pref.slots.includes(afternoonSlot);
-      // O hafta (şu anki iterasyonda) hala hiç nöbetçi seçilmemişse
-      if (isFullDay && pref.dutySlots.length === 0) {
-        pref.dutySlots.push(morningSlot, afternoonSlot);
-        dutyCounts.set(pref.email, (dutyCounts.get(pref.email) || 0) + 1);
-        assignedThisDay++;
-      }
-    }
-
-    // ADIM B: Eğer 3 kontenjan dolmadıysa (assignedThisDay < 3), sadece tek yarım gün seçenlerden "az nöbet tutanları" listeye dahil et
-    for (const pref of candidates) {
-      if (assignedThisDay >= 3) break;
-
-      const isFullDay = pref.slots.includes(morningSlot) && pref.slots.includes(afternoonSlot);
-      // Eğer tüm günse ve zaten seçildiyse (ADIM A) veya haftalık kotası dolduysa pas geç
-      if (!isFullDay && pref.dutySlots.length === 0) {
-        // Hangi slotu seçtiyse onu duty'ye yaz
-        if (pref.slots.includes(morningSlot)) pref.dutySlots.push(morningSlot);
-        if (pref.slots.includes(afternoonSlot)) pref.dutySlots.push(afternoonSlot);
-
-        dutyCounts.set(pref.email, (dutyCounts.get(pref.email) || 0) + 1);
-        assignedThisDay++;
-      }
-    }
-  }
-
-  // İşlenmiş "pending" kayıtları topluca DB'ye "approved" olarak yaz
   let successCount = 0;
-  for (const pref of pending) {
+
+  for (const row of pendingRows) {
+    const dutySlots = assignments.get(row.id) ?? [];
+
     const { error } = await supabase
       .from("mesai_preferences")
-      .update({ status: "approved", duty_slots: pref.dutySlots })
-      .eq("id", pref.id);
+      .update({ status: "approved", duty_slots: dutySlots })
+      .eq("id", row.id);
 
-    if (!error) {
-      successCount++;
-      
-      // İSTEK: Çoklu onamada da kişinin diğer eski onaylanmış kayıtlarını sil (kendi yeni onaylanan kaydı hariç)
-      await supabase
-        .from("mesai_preferences")
-        .delete()
-        .eq("email", pref.email)
-        .eq("status", "approved")
-        .neq("id", pref.id);
-    }
+    if (error) continue;
+
+    successCount++;
+
+    await supabase
+      .from("mesai_preferences")
+      .delete()
+      .eq("email", row.email)
+      .eq("status", "approved")
+      .neq("id", row.id);
   }
 
-  return { successCount, errorCount: pending.length - successCount };
+  return { successCount, errorCount: pendingRows.length - successCount };
 }
 
-// 6. Madde [Ekstra]: Adminin tabloyu sıfırlayabilmesi için
+// -----------------------------------------------------------------------------
+// SİLME
+// -----------------------------------------------------------------------------
+
 export async function clearAllMesaiPreferences(): Promise<void> {
-  // Supabase kütüphanesinde delete yapabilmek için en az 1 filtre (eq/neq vb) zorunludur.
   await supabase.from("mesai_preferences").delete().not("id", "is", null);
 }
-

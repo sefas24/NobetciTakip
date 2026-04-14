@@ -62,7 +62,7 @@ export default function GunSecimiClient({ email, displayName, slots }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: selected, note, schedule_file_url: scheduleFileUrl }),
       });
-      const data = (await res.json()) as { ok: boolean; message?: string; details?: any };
+      const data = (await res.json()) as { ok: boolean; message?: string; details?: string };
 
       if (!res.ok || !data.ok) {
         let errDesc = typeof data.details === "string" ? data.details : JSON.stringify(data.details);
@@ -101,12 +101,7 @@ export default function GunSecimiClient({ email, displayName, slots }: Props) {
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm p-4">
-        <h2 className="text-sm font-semibold text-gray-800 mb-3">
-          1. Adım: Uygun Olduğun Günleri İşaretle
-        </h2>
-        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 leading-relaxed">
-          <span className="font-bold">ÖNEMLİ:</span> Lütfen minimum 2, maksimum 3 gün mesai seçiniz. Ders programınıza göre 1 tam günü, iki farklı gün yarım yarım (Öğleden Önce / Öğleden Sonra) şeklinde bölebilirsiniz.
-        </p>
+        Stashed changes
         <div className="grid grid-cols-2 gap-2 text-sm">
           {slots.map((slot) => {
             const active = selected.includes(slot);
@@ -128,43 +123,7 @@ export default function GunSecimiClient({ email, displayName, slots }: Props) {
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gray-800 mb-1">
-          2. Adım: Ders Programı Ekle
-        </h2>
-        <p className="text-xs text-gray-500">
-          Ders programını (PDF, Excel, Fotoğraf) formatında yükleyebilirsin.
-        </p>
-        <input
-          type="file"
-          accept=".pdf,image/*,.xlsx,.xls,.doc,.docx"
-          onChange={(e) => setScheduleFile(e.target.files?.[0] || null)}
-          className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
-        {scheduleFile && (
-          <p className="text-xs text-green-600 font-medium">Seçilen dosya: {scheduleFile.name}</p>
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gray-800 mb-1">
-          3. Adım: İsteğe Bağlı Not Ekle
-        </h2>
-        <p className="text-xs text-gray-500">
-          Adminin mesaini onaylarken dikkate almasını istediğin özel bir durum varsa buraya yazabilirsin.
-        </p>
-        <textarea
-          className="w-full text-sm p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition"
-          rows={3}
-          placeholder="Örn: Pazartesi öğleden sonraları hastanede stajım olduğu için katılamıyorum..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </section>
-
-      <section className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gray-800 mb-1">
-          4. Adım: Kaydet
-        </h2>
+         Stashed changes
         <p className="text-xs text-gray-500">
           Tercihlerin önce admin ekranına düşecek, o onayladıktan sonra kesin
           mesai listesi oluşturulacak.

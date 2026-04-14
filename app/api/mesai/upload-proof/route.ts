@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
+import type { DbMesaiPreference } from "@/types";
+
 
 export async function POST(req: Request) {
   try {
@@ -67,7 +69,8 @@ export async function POST(req: Request) {
       .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .single() as { data: Pick<DbMesaiPreference, "id" | "image_url"> | null; error: unknown };
+
 
     if (fetchError || !latestApprovedPref) {
       // Sadece Storage'a yüklendi ama DB'de atılacak yer bulunamadıysa bile linki dönebiliriz.

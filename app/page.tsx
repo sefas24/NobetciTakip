@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { listApproved } from "@/lib/mesaiStore";
 import DayCard from "@/components/DayCard";
 import SidebarMenu from "@/components/SidebarMenu";
+import { AdminLoginButton } from "@/components/AdminLoginButton";
 
 export default async function AnaSayfa() {
   const store = await cookies();
   const role = store.get("nt_role")?.value;
   const email = store.get("nt_email")?.value;
-  const fullName = store.get("nt_isim_soyisim")?.value;
+  const fullName = store.get("nt_full_name")?.value;
+  const name = store.get("nt_isim_soyisim")?.value;
 
   // Admin giriş yaptıysa direkt admin paneline gitsin.
   // Öğrenci panelinin mobil dashboard versiyonunu kodluyoruz:
@@ -49,15 +51,18 @@ export default async function AnaSayfa() {
       {/* Üst Bar (Sidebar ve İsim) */}
       <header className="w-full bg-white shadow-sm z-10 px-4 py-4 flex justify-between items-center sticky top-0">
         <SidebarMenu role={role} />
-        
-        <div className="flex flex-col items-end">
-          <span className="text-sm font-bold text-slate-800">{displayName}</span>
-          <span className="text-[10px] text-gray-500">{role === "student" ? "Öğrenci Paneli" : ""}</span>
+
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end">
+            <span className="text-sm font-bold text-slate-800 leading-tight">{displayName}</span>
+            <span className="text-[10px] text-gray-500">{role === "student" ? "Öğrenci Paneli" : ""}</span>
+          </div>
+          <AdminLoginButton />
         </div>
       </header>
 
       <main className="flex-1 px-4 py-6 max-w-lg mx-auto w-full flex flex-col gap-6">
-        
+
         {/* Karşılama ve Uyarı Afişi */}
         <div className="mb-2">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1">
@@ -77,13 +82,13 @@ export default async function AnaSayfa() {
         {/* Bugünün Programı (DayCard) */}
         <div>
           <h3 className="text-sm font-bold text-gray-600 uppercase tracking-widest mb-3">
-             BUGÜNÜN PROGRAMI ({todayName})
+            BUGÜNÜN PROGRAMI ({todayName})
           </h3>
-          
+
           {isWeekend ? (
-             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
-               Bugün hafta sonu, ofiste resmi nöbetçi veya mesai bulunmuyor. İyi tatiller! 🌴
-             </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+              Bugün hafta sonu, ofiste resmi nöbetçi veya mesai bulunmuyor. İyi tatiller! 🌴
+            </div>
           ) : (
             <DayCard
               day={todayName}
@@ -96,9 +101,9 @@ export default async function AnaSayfa() {
         </div>
 
         <div className="text-center mt-4">
-           <p className="text-xs text-gray-400">
-             Tüm haftanın çalışma listesini görmek için yan menüden <b>Mesai & Nöbetler</b> kısmına bakabilirsiniz.
-           </p>
+          <p className="text-xs text-gray-400">
+            Tüm haftanın çalışma listesini görmek için yan menüden <b>Mesai & Nöbetler</b> kısmına bakabilirsiniz.
+          </p>
         </div>
 
       </main>
