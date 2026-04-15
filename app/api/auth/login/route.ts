@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     };
 
     const role = body.role ?? "student";
-    const email = body.email || (role === "admin" ? "admin@test.com" : "student@test.com");
+    const email = (body.email ?? "").trim();
     const password = body.password ?? "";
 
     const authResult = await validateLogin({ role, email, password });
@@ -56,4 +56,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

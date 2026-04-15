@@ -81,9 +81,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             type="button"
             onClick={() => { setRole("student"); setIdentifier(""); setError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-              !isAdmin
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+              !isAdmin ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             Öğrenci Girişi
@@ -92,9 +90,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             type="button"
             onClick={() => { setRole("admin"); setIdentifier(""); setError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-              isAdmin
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+              isAdmin ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             Admin Girişi
@@ -105,15 +101,15 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-              {isAdmin ? "E-posta" : "Öğrenci Numarası"}
+              {isAdmin ? "Kullanıcı Adı" : "Öğrenci Numarası"}
             </label>
             <input
-              type={isAdmin ? "email" : "text"}
-              inputMode={isAdmin ? "email" : "numeric"}
-              placeholder={isAdmin ? "admin@okul.edu.tr" : "230316006"}
+              type="text"
+              inputMode={isAdmin ? "text" : "numeric"}
+              placeholder={isAdmin ? "admin" : "230316006"}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              autoComplete={isAdmin ? "email" : "username"}
+              autoComplete="username"
               className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition placeholder:font-normal placeholder:text-slate-400"
             />
           </div>
@@ -148,9 +144,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
             type="submit"
             disabled={loading}
             className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all shadow-sm ${
-              isAdmin
-                ? "bg-slate-900 text-white hover:bg-slate-700"
-                : "bg-teal-700 text-white hover:bg-teal-800"
+              isAdmin ? "bg-slate-900 text-white hover:bg-slate-700" : "bg-teal-700 text-white hover:bg-teal-800"
             } ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
           >
             {loading ? "Giriş yapılıyor..." : "Giriş Yap"}

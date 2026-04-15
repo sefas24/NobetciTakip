@@ -8,18 +8,18 @@ interface AdminLoginModalProps {
 }
 
 export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const emailRef = useRef<HTMLInputElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      setEmail("");
+      setUsername("");
       setPassword("");
-      setTimeout(() => emailRef.current?.focus(), 50);
+      setTimeout(() => usernameRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
@@ -41,7 +41,7 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "admin", email, password }),
+        body: JSON.stringify({ role: "admin", email: username, password }),
       });
       const data = (await res.json()) as { ok: boolean; message?: string };
       if (!res.ok || !data.ok) {
@@ -76,20 +76,25 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
         </div>
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-700" htmlFor="admin-modal-email">Admin E-posta</label>
+            <label className="text-xs font-semibold text-gray-700" htmlFor="admin-modal-username">
+              Kullanıcı Adı
+            </label>
             <input
-              id="admin-modal-email"
-              ref={emailRef}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="admin-modal-username"
+              ref={usernameRef}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
-              placeholder="admin@okul.edu.tr"
+              placeholder="admin"
+              autoComplete="username"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-700" htmlFor="admin-modal-password">Şifre</label>
+            <label className="text-xs font-semibold text-gray-700" htmlFor="admin-modal-password">
+              Şifre
+            </label>
             <input
               id="admin-modal-password"
               type="password"

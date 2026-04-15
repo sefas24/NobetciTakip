@@ -13,14 +13,13 @@ export async function validateLogin(input: {
   email: string;
   password: string;
 }): Promise<LoginResult> {
+  // Her iki rol için de @ işareti olmadan düz kullanıcı adı ile giriş desteklenir
   const rawInput = input.email.trim();
-  const queryEmail = input.role === "admin"
-  ? rawInput.toLowerCase()
-  : rawInput.includes("@") ? rawInput.split("@")[0] : rawInput;
+  const queryEmail = rawInput.includes("@") ? rawInput.split("@")[0] : rawInput.toLowerCase();
   const { password } = input;
 
   if (!queryEmail || !password) {
-    return { ok: false, message: "E-posta ve şifre zorunludur." };
+    return { ok: false, message: "Kullanıcı adı ve şifre zorunludur." };
   }
 
   const { data: user } = await supabase
@@ -31,7 +30,7 @@ export async function validateLogin(input: {
 
   if (input.role === "admin") {
     if (!user || user.role !== "admin" || user.password !== password) {
-      return { ok: false, message: "Yönetici e-posta veya şifresi hatalı." };
+      return { ok: false, message: "Yönetici kullanıcı adı veya şifresi hatalı." };
     }
     return {
       ok: true,
@@ -47,7 +46,7 @@ export async function validateLogin(input: {
     return { ok: false, message: "Kullanıcı bulunamadı. Lütfen yöneticinizle iletişime geçin." };
   }
   if (user.password !== password) {
-    return { ok: false, message: "E-posta veya şifre hatalı." };
+    return { ok: false, message: "Öğrenci numarası veya şifre hatalı." };
   }
 
   return {
