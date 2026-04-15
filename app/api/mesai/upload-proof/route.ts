@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import type { DbMesaiPreference } from "@/types";
 
-
 export async function POST(req: Request) {
   try {
     const jar = await cookies();
@@ -18,6 +17,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const note = (formData.get("note") as string | null)?.trim() || null;
 
     if (!file) {
       return NextResponse.json(
@@ -26,16 +26,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convert file to array buffer for Supabase Storage
     const buffer = await file.arrayBuffer();
 
-    // Benzersiz bir dosya adı oluşturalım
     const fileExt = file.name.split(".").pop();
     const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
     const fileName = `${safeEmail}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    // Supabase Storage'a yükle ('rapor_fotograflari' bucket'ına)
     const { error: uploadError } = await supabase.storage
       .from("rapor_fotograflari")
       .upload(filePath, buffer, {
@@ -48,59 +45,64 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          message: "Fotoğraf Storage alanına yüklenemedi. ('rapor_fotograflari' bucket'ı bulunamadı veya yetki yok)",
+          message: "Fotoğraf Storage alanına yüklenemedi.",
           details: JSON.stringify(uploadError),
         },
         { status: 500 }
       );
     }
 
-    // Yüklenen dosyanın public URL'ini al
     const {
       data: { publicUrl },
     } = supabase.storage.from("rapor_fotograflari").getPublicUrl(filePath);
 
-    // KULLANICININ ONAYLANMIŞ SON MESAİSİNE BU URL'Yİ İŞLE
-    // Not: "En son onaylanan" kaydı bulup ona attach edelim.
-    const { data: latestApprovedPref, error: fetchError } = await supabase
+    const { data: latestPref, error: fetchError } = await supabase
       .from("mesai_preferences")
-      .select("id, image_url")
+      .select("id, image_url, note, status")
       .eq("email", email)
-      .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(1)
-      .single() as { data: Pick<DbMesaiPreference, "id" | "image_url"> | null; error: unknown };
+      .single() as {
+        data: Pick<DbMesaiPreference, "id" | "image_url" | "note" | "status"> | null;
+        error: unknown;
+      };
 
-
-    if (fetchError || !latestApprovedPref) {
-      // Sadece Storage'a yüklendi ama DB'de atılacak yer bulunamadıysa bile linki dönebiliriz.
+    if (fetchError || !latestPref) {
       return NextResponse.json({
         ok: true,
-        message: "Dosya yüklendi ama onaylı nöbet kaydınız bulunamadığı için veritabanına bağlanamadı.",
+        message: "Dosya yüklendi fakat nöbet kaydınız bulunamadığı için veritabanına bağlanamadı. Lütfen yöneticinizle iletişime geçin.",
         url: publicUrl,
       });
     }
 
-    // Güncelleme İşlemi (image_url) sütunu
-    // İSTEK: Çoklu fotoğraf yüklemelerinde eskileri ezme, yan yana virgülle kaydet.
     let newImageUrl = publicUrl;
-    if (latestApprovedPref.image_url) {
-      newImageUrl = `${latestApprovedPref.image_url},${publicUrl}`;
+    if (latestPref.image_url) {
+      newImageUrl = `${latestPref.image_url},${publicUrl}`;
+    }
+
+    let newNote = latestPref.note || null;
+    if (note) {
+      newNote = latestPref.note ? `${latestPref.note}\n---\n${note}` : note;
+    }
+
+    const updatePayload: Record<string, unknown> = { image_url: newImageUrl };
+    if (newNote !== null) {
+      updatePayload.note = newNote;
     }
 
     const { error: dbUpdateError } = await supabase
       .from("mesai_preferences")
-      .update({ image_url: newImageUrl })
-      .eq("id", latestApprovedPref.id);
+      .update(updatePayload)
+      .eq("id", latestPref.id);
 
     if (dbUpdateError) {
-      console.error("DB URL Güncelleme Hatası:", dbUpdateError);
+      console.error("DB Güncelleme Hatası:", dbUpdateError);
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Dosya yüklendi fakat veritabanına kaydedilemedi. (mesai_preferences tablosunda image_url sütunu oluşturulmuş mu?)",
+          message: "Dosya yüklendi fakat veritabanına kaydedilemedi.",
           details: dbUpdateError.message,
+          url: publicUrl,
         },
         { status: 500 }
       );
@@ -111,15 +113,19 @@ export async function POST(req: Request) {
       message: "Başarılı",
       url: publicUrl,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorMsg =
       error instanceof Error
         ? error.message
-        : JSON.stringify(error, Object.getOwnPropertyNames(error));
+        : JSON.stringify(error, Object.getOwnPropertyNames(error as object));
     console.error("Sunucu Hatası (Upload):", errorMsg);
 
     return NextResponse.json(
-      { ok: false, message: "Fotoğraf yüklerken beklenmeyen bir hata oluştu.", details: errorMsg },
+      {
+        ok: false,
+        message: "Fotoğraf yüklerken beklenmeyen bir hata oluştu.",
+        details: errorMsg,
+      },
       { status: 500 }
     );
   }

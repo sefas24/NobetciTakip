@@ -13,6 +13,7 @@ export default function CameraCapture() {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [photoFilename, setPhotoFilename] = useState<string>("nobet-kanit.jpg");
   const [uploading, setUploading] = useState(false);
+  const [note, setNote] = useState<string>("");
 
   const isSecureContextHint = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -131,12 +132,12 @@ export default function CameraCapture() {
     if (!file) return;
 
     if (!validateFile(file)) {
-      e.target.value = ""; // Formu sıfırla
+      e.target.value = "";
       return;
     }
 
-    await uploadFileToSupabase(file);
-    e.target.value = ""; // Formu sıfırla
+    await uploadFileToSupabase(file, note.trim() || null);
+    e.target.value = "";
   };
 
   // Convert canvas Base64 Data URL to a native File object and upload it
@@ -144,27 +145,27 @@ export default function CameraCapture() {
     if (!photoDataUrl) return;
 
     try {
-      // Decode base64 to Blob -> File
       const res = await fetch(photoDataUrl);
       const blob = await res.blob();
       const file = new File([blob], photoFilename, { type: "image/jpeg" });
 
-      await uploadFileToSupabase(file);
-    } catch (err: any) {
+      await uploadFileToSupabase(file, note.trim() || null);
+    } catch {
       toast.error("Kamera fotoğrafı dönüştürülürken hata oluştu.");
     }
   };
 
-  const uploadFileToSupabase = async (file: File) => {
+  const uploadFileToSupabase = async (file: File, noteText: string | null) => {
     setUploading(true);
     const loadingToast = toast.loading("Fotoğraf yükleniyor...");
 
     try {
-      // 1. Create FormData because we are sending a file buffer to our Next.js API route
       const formData = new FormData();
       formData.append("file", file);
+      if (noteText) {
+        formData.append("note", noteText);
+      }
 
-      // 2. Call the server action / API route (to keep Supabase keys hidden and session secure)
       const res = await fetch("/api/mesai/upload-proof", {
         method: "POST",
         body: formData,
@@ -177,10 +178,11 @@ export default function CameraCapture() {
       }
 
       toast.success("Fotoğraf başarıyla nöbet kaydınıza eklendi!", { id: loadingToast });
-      setPhotoDataUrl(null); // Başarılıysa önizlemeyi kapatabiliriz
-
-    } catch (err: any) {
-      toast.error(err.message || "Bilinmeyen bir hata oluştu.", { id: loadingToast });
+      setPhotoDataUrl(null);
+      setNote("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu.";
+      toast.error(msg, { id: loadingToast });
     } finally {
       setUploading(false);
     }
@@ -262,6 +264,19 @@ export default function CameraCapture() {
           <div className="relative aspect-video sm:aspect-video w-full bg-slate-100 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoDataUrl} alt="Önizleme" className="w-full h-full object-cover" />
+          </div>
+          {/* Açıklama / Not Alanı */}
+          <div className="px-4 pt-4 pb-2">
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Açıklama <span className="text-slate-400 font-normal normal-case">(isteğe bağlı)</span>
+            </label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Kamera erişiminiz yoksa veya başka bir cihazdan yükleme yapıyorsanız kısa bir açıklama yazabilirsiniz..."
+              rows={3}
+              className="w-full text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent placeholder:text-slate-400 leading-relaxed"
+            />
           </div>
           <div className="p-4 bg-white flex justify-center flex-wrap gap-3 border-t border-slate-100">
             <a
