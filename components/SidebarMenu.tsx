@@ -77,15 +77,6 @@ export default function SidebarMenu({ role }: { role?: string }) {
             </Link>
 
             <Link 
-              href="/gun-secimi" 
-              onClick={toggleSidebar}
-              className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-            >
-              <span className="text-xl">📅</span>
-              Çalışma Günü Tercihi
-            </Link>
-
-            <Link 
               href="/kamera" 
               onClick={toggleSidebar}
               className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"

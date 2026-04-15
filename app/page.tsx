@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SidebarMenu from "@/components/SidebarMenu";
+import { AdminLoginButton } from "@/components/AdminLoginButton";
 import {
   getCurrentRotationWeek,
   getDutyNamesForDay,
@@ -63,11 +64,7 @@ export default async function AnaSayfa() {
         <SidebarMenu role={role} />
         <div className="flex items-center gap-3">
           
-          <a href="/login"
-            className="text-[11px] font-semibold text-slate-400 hover:text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1 transition"
-          >
-            Admin
-          </a>
+          <AdminLoginButton />
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-sky-700">
@@ -170,62 +167,87 @@ export default async function AnaSayfa() {
           )}
         </div>
 
-        {/* Mesai */}
-        {!isWeekend && todayMesai && (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Mesai Programı</p>
-              <p className="text-sm font-semibold text-slate-800">{todayName}</p>
-            </div>
+                  {/* Mesai */}
+                  {!isWeekend && todayMesai && (
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Mesai Programı</p>
+                        <p className="text-sm font-semibold text-slate-800">{todayName}</p>
+                      </div>
 
-            <div className="divide-y divide-slate-100">
-              {/* Öğleden Önce */}
-              <div className="px-4 py-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Öğleden Önce · 09:00–12:30
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {todayMesai.morning.map((isim) => {
-                    const isSelf = userFullName &&
-                      isim.toLowerCase() === userFullName.toLowerCase();
-                    return (
-                      <span key={isim} className={`text-xs px-2.5 py-1 rounded-lg border font-medium ${
-                        isSelf
-                          ? "bg-sky-100 text-sky-800 border-sky-200"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}>
-                        {isim}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
+                      {(() => {
+                        // Tüm benzersiz isimleri sırayla topla (önce öö sırası, sonra ekstra ös)
+                        const allNames = [
+                          ...todayMesai.morning,
+                          ...todayMesai.afternoon.filter(
+                            (isim) => !todayMesai.morning.includes(isim)
+                          ),
+                        ];
 
-              {/* Öğleden Sonra */}
-              <div className="px-4 py-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Öğleden Sonra · 13:30–17:00
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {todayMesai.afternoon.map((isim) => {
-                    const isSelf = userFullName &&
-                      isim.toLowerCase() === userFullName.toLowerCase();
-                    return (
-                      <span key={isim} className={`text-xs px-2.5 py-1 rounded-lg border font-medium ${
-                        isSelf
-                          ? "bg-sky-100 text-sky-800 border-sky-200"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}>
-                        {isim}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                        return (
+                          <div>
+                            {/* Başlık */}
+                            <div className="grid grid-cols-2 border-b border-slate-100">
+                              <div className="px-4 py-2 border-r border-slate-100">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  Öğleden Önce · 09:00–12:30
+                                </p>
+                              </div>
+                              <div className="px-4 py-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  Öğleden Sonra · 13:30–17:00
+                                </p>
+                              </div>
+                            </div>
 
+                            {/* Satırlar */}
+                            {allNames.map((isim, i) => {
+                              const hasMorning = todayMesai.morning.includes(isim);
+                              const hasAfternoon = todayMesai.afternoon.includes(isim);
+                              const isSelf = userFullName &&
+                                isim.toLowerCase() === userFullName.toLowerCase();
+
+                              return (
+                                <div key={isim} className={`grid grid-cols-2 ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                                  {/* Öğleden Önce */}
+                                  <div className="px-4 py-1.5 border-r border-slate-100 flex items-center">
+                                    {hasMorning && (
+                                      <>
+                                        <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
+                                          {isim}
+                                        </span>
+                                        {isSelf && (
+                                          <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
+                                            Sen
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Öğleden Sonra */}
+                                  <div className="px-4 py-1.5 flex items-center">
+                                    {hasAfternoon && (
+                                      <>
+                                        <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
+                                          {isim}
+                                        </span>
+                                        {isSelf && (
+                                          <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
+                                            Sen
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
         <p className="text-center text-xs text-slate-300 pb-2">
           Tüm haftalık plan için{" "}
           <span className="font-semibold text-slate-400">Mesai & Nöbetler</span> bölümüne bakın.
