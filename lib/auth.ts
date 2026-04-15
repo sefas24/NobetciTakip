@@ -1,68 +1,80 @@
-import { supabase } from "./supabase";
+// =============================================================================
+// lib/auth.ts
+//
+// Kullanıcı kimlik doğrulama işlemleri.
+// UserRole ve LoginResult tipleri artık types/index.ts'ten geliyor.
+// =============================================================================
 
-export type UserRole = "admin" | "student";
+import { supabase } from "./supabase";
+import type { DbUser, LoginResult, UserRole } from "@/types";
 
 export async function validateLogin(input: {
   role: UserRole;
   email: string;
   password: string;
-}): Promise<{ ok: true; email: string; role: UserRole; isim_soyisim?: string; needsPasswordChange?: boolean } | { ok: false; message: string }> {
-  const email = input.email.trim().toLowerCase();
-  const password = input.password;
+}): Promise<LoginResult> {
+  const rawInput = input.email.trim();
+  const queryEmail = input.role === "admin"
+  ? rawInput.toLowerCase()
+  : rawInput.includes("@") ? rawInput.split("@")[0] : rawInput;
+  const { password } = input;
 
-  if (!email || !password) {
+  if (!queryEmail || !password) {
     return { ok: false, message: "E-posta ve şifre zorunludur." };
   }
 
-  // Supabase'den kullanıcı sorgula
   const { data: user } = await supabase
     .from("users")
-    .select("*, is_password_changed")
-    .eq("email", email)
-    .maybeSingle();
+    .select("*")
+    .eq("email", queryEmail)
+    .maybeSingle() as { data: DbUser | null };
 
   if (input.role === "admin") {
-    // Admin yetkisi kontrolü
     if (!user || user.role !== "admin" || user.password !== password) {
       return { ok: false, message: "Yönetici e-posta veya şifresi hatalı." };
     }
-    return { ok: true, email, role: "admin", isim_soyisim: user?.isim_soyisim, needsPasswordChange: false };
-  } else {
-    // Öğrenci Rolü
-    if (!user) {
-      return { ok: false, message: "Kullanıcı bulunamadı. Lütfen yöneticinizle iletişime geçin." };
-    }
-
-    if (user.password !== password) {
-      return { ok: false, message: "E-posta veya şifre hatalı." };
-    }
-
-    // Şifre doğruysa is_password_changed alanını kontrol et
-    if (!user.is_password_changed) {
-      return { ok: true, email, role: "student", isim_soyisim: user.isim_soyisim, needsPasswordChange: true };
-    }
-
-    return { ok: true, email, role: "student", isim_soyisim: user.isim_soyisim, needsPasswordChange: false };
+    return {
+      ok: true,
+      email: queryEmail,
+      role: "admin",
+      fullName: user.isim_soyisim ?? undefined,
+      needsPasswordChange: false,
+    };
   }
+
+  // Öğrenci
+  if (!user) {
+    return { ok: false, message: "Kullanıcı bulunamadı. Lütfen yöneticinizle iletişime geçin." };
+  }
+  if (user.password !== password) {
+    return { ok: false, message: "E-posta veya şifre hatalı." };
+  }
+
+  return {
+    ok: true,
+    email: queryEmail,
+    role: "student",
+    fullName: user.isim_soyisim ?? undefined,
+    needsPasswordChange: !user.is_password_changed,
+  };
 }
 
-// Şifre belirleme formundan gelen yeni şifreyi kaydedecek metod
-export async function updateStudentPassword(email: string, newPassword: string) {
+export async function updateStudentPassword(email: string, newPassword: string): Promise<void> {
   const normalizedEmail = email.toLowerCase();
+
   const { data: user } = await supabase
     .from("users")
     .select("id")
     .eq("email", normalizedEmail)
-    .maybeSingle();
+    .maybeSingle() as { data: Pick<DbUser, "id"> | null };
 
   if (user) {
-    // Varsa güncelle ve is_password_changed durumunu true yap
     await supabase
       .from("users")
       .update({ password: newPassword, is_password_changed: true })
       .eq("email", normalizedEmail);
   } else {
-    // Ekstrem Durum: Yoksa DB'ye yeni bir ekleme yapar (aslında admin'in önceden eklemiş olması beklenir)
+    // Ekstrem durum: admin kullanıcıyı önceden eklemiş olmalıydı
     await supabase.from("users").insert({
       email: normalizedEmail,
       password: newPassword,
@@ -72,8 +84,7 @@ export async function updateStudentPassword(email: string, newPassword: string) 
   }
 }
 
-// Demo Modu İçin: Bütün öğrenci hesaplarını sıfırlayan metod.
-export async function clearDemoPasswords() {
+// Demo/test ortamı için — production'da bu endpoint kaldırılmalıdır
+export async function clearDemoPasswords(): Promise<void> {
   await supabase.from("users").delete().eq("role", "student");
 }
-

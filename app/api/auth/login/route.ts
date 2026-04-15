@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { validateLogin, type UserRole } from "@/lib/auth";
+import { validateLogin } from "@/lib/auth";
+import type { UserRole } from "@/types";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
@@ -34,8 +35,8 @@ export async function POST(req: Request) {
     cookieStore.set("nt_email", authResult.email, cookieOptions);
     
     // Ad-Soyad varsa kaydet
-    if (authResult.isim_soyisim) {
-       cookieStore.set("nt_isim_soyisim", authResult.isim_soyisim, cookieOptions);
+    if (authResult.fullName) {
+       cookieStore.set("nt_isim_soyisim", authResult.fullName, cookieOptions);
     } else {
        // Yoksa veya null gelirse eski cookieyi temizle (Güvenlik için)
        cookieStore.delete("nt_isim_soyisim");
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       ok: true,
       email: authResult.email,
       role: authResult.role,
-      name: authResult.isim_soyisim,
+      name: authResult.fullName,
       needsPasswordChange: authResult.needsPasswordChange
     });
   } catch {

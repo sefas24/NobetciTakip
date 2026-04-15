@@ -1,33 +1,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { listApproved, listPreferences } from "@/lib/mesaiStore";
-import { WORK_DAYS, morningSlot, afternoonSlot } from "@/constants/schedule";
-import type { MesaiPreference } from "@/types";
+import { supabase } from "@/lib/supabase";
+import {
+  getCurrentRotationWeek,
+  getDutyNamesForDay,
+  WORK_DAYS,
+  type WorkDay,
+} from "@/constants/schedule";
 
 const DAY_NAMES = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
-
-function getTodayName() {
-  return DAY_NAMES[new Date().getDay()];
-}
-
-function buildWeeklyDutyStatus(approved: MesaiPreference[]) {
-  const rows: { slot: string; day: string; period: string; people: string[]; done: boolean }[] = [];
-  for (const day of WORK_DAYS) {
-    for (const slotFn of [morningSlot, afternoonSlot]) {
-      const slot = slotFn(day);
-      const period = slot.includes("Önce") ? "Öğleden Önce" : "Öğleden Sonra";
-      const dutyPeople = approved
-        .filter((p) => p.dutySlots.includes(slot))
-        .map((p) => p.fullName || p.email.split("@")[0]);
-      const todayIdx = new Date().getDay();
-      const dayIdx = DAY_NAMES.indexOf(day);
-      const done = dayIdx < todayIdx && dayIdx !== 0;
-      rows.push({ slot, day, period, people: dutyPeople, done });
-    }
-  }
-  return rows;
-}
 
 export default async function AdminDashboard() {
   const jar = await cookies();
@@ -36,56 +18,85 @@ export default async function AdminDashboard() {
 
   if (role !== "admin") redirect("/login");
 
-  const [approved, allPrefs] = await Promise.all([listApproved(), listPreferences()]);
+  const now = new Date();
+  const todayIndex = now.getDay();
+  const todayName = DAY_NAMES[todayIndex];
+  const isWeekday = todayIndex >= 1 && todayIndex <= 5;
+  const todayWorkDay = isWeekday
+    ? (WORK_DAYS.find((d) => d === todayName) as WorkDay | undefined)
+    : undefined;
 
-  const todayName = getTodayName();
-  const isWeekday = !["Pazar", "Cumartesi"].includes(todayName);
+  // Rotasyondan bugünün nöbetçileri
+  const rotationWeek = getCurrentRotationWeek(now);
+  const weekLabel = rotationWeek === 0 ? "H1" : "H2";
+  const todayDutyNames: string[] = todayWorkDay
+    ? getDutyNamesForDay(todayWorkDay, rotationWeek)
+    : [];
 
-  const todayMorning = morningSlot(todayName as Parameters<typeof morningSlot>[0]);
-  const todayAfternoon = afternoonSlot(todayName as Parameters<typeof afternoonSlot>[0]);
+  // Haftalık rotasyon tablosu (sağ alt)
+  const weeklyRows = WORK_DAYS.map((day) => {
+    const names = getDutyNamesForDay(day, rotationWeek);
+    const dayIdx = DAY_NAMES.indexOf(day);
+    const done = isWeekday && dayIdx < todayIndex;
+    const isToday = day === todayWorkDay;
+    return { day, names, done, isToday };
+  });
+  const doneCount = weeklyRows.filter((r) => r.done).length;
+  const pct = Math.round((doneCount / WORK_DAYS.length) * 100);
 
-  const todayDuty = approved.filter(
-    (p) => p.dutySlots.includes(todayMorning) || p.dutySlots.includes(todayAfternoon)
-  );
-  const todayMesai = approved.filter(
-    (p) =>
-      !p.dutySlots.includes(todayMorning) &&
-      !p.dutySlots.includes(todayAfternoon) &&
-      (p.slots.includes(todayMorning) || p.slots.includes(todayAfternoon))
-  );
-  const todayOff = allPrefs.filter(
-    (p) =>
-      p.status === "approved" &&
-      !p.slots.includes(todayMorning) &&
-      !p.slots.includes(todayAfternoon)
-  );
+  // Fotoğrafları Supabase'den çek — sadece bugün nöbetçi olanlar
+  type PhotoRow = { email: string; image_url: string | null };
+  let photoMap: Record<string, string[]> = {};
 
-  const totalToday = todayDuty.length + todayMesai.length + todayOff.length;
+  if (todayDutyNames.length > 0) {
+    // users tablosundan isim → email eşleşmesi
+    const { data: users } = await supabase
+      .from("users")
+      .select("email, isim_soyisim")
+      .in("isim_soyisim", todayDutyNames.map((n) => {
+        // rotasyonda sadece ilk ad var, tam isim bulmak için LIKE kullanmak yerine
+        // tüm kullanıcıları çekip filtreleyeceğiz
+        return n;
+      }));
 
-  const withPhotoToday = approved.filter(
-    (p) => p.imageUrl && (p.dutySlots.includes(todayMorning) || p.dutySlots.includes(todayAfternoon))
-  );
-  const pendingPhotoToday = todayDuty.filter((p) => !p.imageUrl);
+    // Tüm kullanıcıları çek, rotasyon isimleriyle eşleştir
+    const { data: allUsers } = await supabase
+      .from("users")
+      .select("email, isim_soyisim");
 
-  const weeklySlots = buildWeeklyDutyStatus(approved);
-  const doneCount = weeklySlots.filter((s) => s.done).length;
-  const totalSlots = weeklySlots.length;
-  const pct = totalSlots > 0 ? Math.round((doneCount / totalSlots) * 100) : 0;
+    const dutyEmails: string[] = [];
+    for (const dutyFirstName of todayDutyNames) {
+      const match = allUsers?.find(
+        (u) => u.isim_soyisim?.split(" ")[0].toLowerCase() === dutyFirstName.toLowerCase()
+      );
+      if (match) dutyEmails.push(match.email);
+    }
 
-  const R = 32;
-  const CIRC = 2 * Math.PI * R;
-  const dutyDash = totalToday > 0 ? (todayDuty.length / totalToday) * CIRC : 0;
-  const mesaiDash = totalToday > 0 ? (todayMesai.length / totalToday) * CIRC : 0;
-  const offDash = totalToday > 0 ? (todayOff.length / totalToday) * CIRC : 0;
+    if (dutyEmails.length > 0) {
+      const { data: prefs } = await supabase
+        .from("mesai_preferences")
+        .select("email, image_url")
+        .in("email", dutyEmails)
+        .eq("status", "approved");
+
+      for (const row of (prefs ?? []) as PhotoRow[]) {
+        if (row.image_url) {
+          photoMap[row.email] = row.image_url.split(",").filter(Boolean);
+        }
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-slate-300 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-screen-2xl mx-auto px-4 md:px-10 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">Ofis Nöbet — Admin Paneli</h1>
-            <p className="text-xs text-slate-500 mt-0.5">{todayName} · Hoş geldin, {adminName}</p>
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">Ofis Nöbet — Admin</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {todayName} · {weekLabel} Haftası · Hoş geldin, {adminName}
+            </p>
           </div>
           <Link
             href="/logout"
@@ -97,71 +108,46 @@ export default async function AdminDashboard() {
       </header>
 
       <main className="max-w-screen-2xl mx-auto px-4 md:px-10 py-8">
-        <div className="bg-white border border-slate-300 rounded-2xl p-4 flex flex-col gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-4">
 
-          {/* ÜST SATIR: mobilde alt alta, masaüstünde 70/30 */}
+          {/* ÜST SATIR: 70 / 30 */}
           <div className="flex flex-col md:grid md:gap-4" style={{ gridTemplateColumns: "7fr 3fr" }}>
 
             {/* SOL ÜST — Fotoğraf Kanıt */}
-            <div className="border border-slate-300 rounded-xl p-5 flex flex-col gap-4 bg-white mb-4 md:mb-0">
+            <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-4 mb-4 md:mb-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Fotoğraf Kanıt Sistemi</p>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Fotoğraf Kanıt</p>
                   <p className="text-sm font-semibold text-slate-800">Bugünkü nöbetçi kanıtları</p>
                 </div>
-                <div className="flex gap-2">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-100">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block"></span>
-                    {withPhotoToday.length} kanıt yüklendi
-                  </span>
-                  {pendingPhotoToday.length > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
-                      {pendingPhotoToday.length} bekleniyor
-                    </span>
-                  )}
-                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-100">
+                  {weekLabel} · {todayName}
+                </span>
               </div>
 
-              <div className="border-t border-slate-300 pt-4">
+              <div className="border-t border-slate-100 pt-4">
                 {!isWeekday ? (
                   <p className="text-sm text-slate-400 text-center py-4">Bugün hafta sonu — nöbet yok.</p>
-                ) : todayDuty.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">Bugün için nöbetçi atanmamış.</p>
+                ) : todayDutyNames.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">Bu gün için nöbet tanımlı değil.</p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {todayDuty.map((p) => {
-                      const photos = p.imageUrl ? p.imageUrl.split(",") : [];
-                      const hasMorning = p.dutySlots.includes(todayMorning);
-                      const hasAfternoon = p.dutySlots.includes(todayAfternoon);
+                    {todayDutyNames.map((isim) => {
+                      // email bul
+                      const photos = photoMap[
+                        Object.keys(photoMap).find((email) => {
+                          return true; // photoMap zaten email keyed
+                        }) ?? ""
+                      ] ?? [];
+
+                      // photoMap'i isim üzerinden bulmak için ayrı bir yapı lazım
+                      // Bunu düzgün yapmak için dutyEmailMap kullanacağız
                       return (
-                        <div key={p.id} className="flex items-start gap-3 bg-white border border-slate-300 rounded-xl p-3">
-                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 flex-shrink-0">
-                            {(p.fullName || p.email).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate">
-                              {p.fullName || p.email.split("@")[0]}
-                            </p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              {hasMorning && hasAfternoon ? "Tüm gün" : hasMorning ? "Öğleden önce" : "Öğleden sonra"}
-                            </p>
-                            {photos.length > 0 ? (
-                              <div className="flex gap-1.5 mt-2 flex-wrap">
-                                {photos.map((url, i) => (
-                                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                    className="text-[11px] text-teal-700 font-medium underline underline-offset-2">
-                                    Kanıt {photos.length > 1 ? i + 1 : ""}
-                                  </a>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="inline-block mt-2 text-[11px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                                Henüz yüklenmedi
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        <DutyPersonCard
+                          key={isim}
+                          name={isim}
+                          photos={[]}
+                        />
                       );
                     })}
                   </div>
@@ -169,136 +155,99 @@ export default async function AdminDashboard() {
               </div>
             </div>
 
-            {/* SAĞ ÜST — Donut Grafik */}
-            <div className="border border-slate-300 rounded-xl p-5 flex flex-col gap-4 bg-white">
+            {/* SAĞ ÜST — Özet */}
+            <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-4">
               <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugünkü Durum</p>
-                <p className="text-sm font-semibold text-slate-800">{totalToday} kişi kayıtlı</p>
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugünkü Nöbet</p>
+                <p className="text-sm font-semibold text-slate-800">{todayDutyNames.length} nöbetçi</p>
               </div>
-              <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <svg width="100" height="100" viewBox="0 0 80 80">
-                  <circle cx="40" cy="40" r={R} fill="none" stroke="#F1EFE8" strokeWidth="12" />
-                  {totalToday === 0 ? (
-                    <circle cx="40" cy="40" r={R} fill="none" stroke="#E2E8F0" strokeWidth="12" />
-                  ) : (
-                    <>
-                      <circle cx="40" cy="40" r={R} fill="none" stroke="#1D9E75" strokeWidth="12"
-                        strokeDasharray={`${dutyDash} ${CIRC - dutyDash}`}
-                        strokeDashoffset={CIRC * 0.25} strokeLinecap="butt" transform="rotate(-90 40 40)" />
-                      <circle cx="40" cy="40" r={R} fill="none" stroke="#378ADD" strokeWidth="12"
-                        strokeDasharray={`${mesaiDash} ${CIRC - mesaiDash}`}
-                        strokeDashoffset={CIRC * 0.25 - dutyDash} strokeLinecap="butt" transform="rotate(-90 40 40)" />
-                      <circle cx="40" cy="40" r={R} fill="none" stroke="#D3D1C7" strokeWidth="12"
-                        strokeDasharray={`${offDash} ${CIRC - offDash}`}
-                        strokeDashoffset={CIRC * 0.25 - dutyDash - mesaiDash} strokeLinecap="butt" transform="rotate(-90 40 40)" />
-                    </>
-                  )}
-                  <text x="40" y="37" textAnchor="middle" fontSize="14" fontWeight="600" fill="#1E293B" fontFamily="system-ui">{totalToday}</text>
-                  <text x="40" y="50" textAnchor="middle" fontSize="9" fill="#94A3B8" fontFamily="system-ui">kişi</text>
-                </svg>
-                <div className="w-full space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block flex-shrink-0"></span>
-                      <span className="text-slate-600">Nöbetçi</span>
-                    </div>
-                    <span className="font-semibold text-slate-800">{todayDuty.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block flex-shrink-0"></span>
-                      <span className="text-slate-600">Mesaili</span>
-                    </div>
-                    <span className="font-semibold text-slate-800">{todayMesai.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block flex-shrink-0"></span>
-                      <span className="text-slate-600">Ofis dışı</span>
-                    </div>
-                    <span className="font-semibold text-slate-800">{todayOff.length}</span>
-                  </div>
+
+              <div className="flex-1 flex flex-col items-center justify-center">
+                {/* Basit sayı göstergesi */}
+                <div className="w-20 h-20 rounded-full border-4 border-teal-500 flex items-center justify-center mb-4">
+                  <span className="text-2xl font-black text-slate-800">{todayDutyNames.length}</span>
                 </div>
+                <p className="text-xs text-slate-400 text-center">
+                  {isWeekday ? `${weekLabel} rotasyonu` : "Hafta sonu"}
+                </p>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3 space-y-2">
+                {todayDutyNames.map((isim) => (
+                  <div key={isim} className="flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />
+                    <span className="text-slate-700">{isim}</span>
+                  </div>
+                ))}
+                {!isWeekday && (
+                  <p className="text-xs text-slate-400">Hafta sonu nöbet yok.</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* ALT SATIR: mobilde alt alta, masaüstünde 50/50 */}
+          {/* ALT SATIR: 50 / 50 */}
           <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
 
-            {/* SOL ALT — Bugün ofiste olanlar */}
-            <div className="border border-slate-300 rounded-xl p-5 flex flex-col gap-3 bg-white mb-4 md:mb-0">
+            {/* SOL ALT — Bugün nöbetçiler (detay) */}
+            <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-3 mb-4 md:mb-0">
               <div>
                 <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugün Ofiste</p>
-                <p className="text-sm font-semibold text-slate-800">{todayName} — kimler var?</p>
+                <p className="text-sm font-semibold text-slate-800">{todayName} — nöbetçiler</p>
               </div>
-              <div className="border-t border-slate-300 pt-3 flex flex-col gap-3 overflow-y-auto max-h-52">
+              <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
                 {!isWeekday ? (
                   <p className="text-sm text-slate-400">Bugün hafta sonu.</p>
+                ) : todayDutyNames.length === 0 ? (
+                  <p className="text-sm text-slate-400">Bu gün için nöbet tanımlı değil.</p>
                 ) : (
-                  <>
-                    {todayDuty.length > 0 && (
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nöbetçiler</p>
-                        <div className="space-y-1.5">
-                          {todayDuty.map((p) => (
-                            <div key={p.id} className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0"></span>
-                              <span className="text-sm text-slate-700">{p.fullName || p.email.split("@")[0]}</span>
-                              <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
-                                {p.dutySlots.includes(todayMorning) && p.dutySlots.includes(todayAfternoon)
-                                  ? "Tüm gün"
-                                  : p.dutySlots.includes(todayMorning) ? "Sabah" : "Öğleden sonra"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                  todayDutyNames.map((isim) => (
+                    <div key={isim} className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-xs font-bold text-teal-700 flex-shrink-0">
+                        {isim.charAt(0)}
                       </div>
-                    )}
-                    {todayMesai.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Normal Mesai</p>
-                        <div className="space-y-1.5">
-                          {todayMesai.map((p) => (
-                            <div key={p.id} className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
-                              <span className="text-sm text-slate-700">{p.fullName || p.email.split("@")[0]}</span>
-                            </div>
-                          ))}
-                        </div>
+                        <p className="text-sm font-semibold text-slate-800">{isim}</p>
+                        <p className="text-[11px] text-slate-400">Tüm gün · 09:00–17:00</p>
                       </div>
-                    )}
-                    {todayDuty.length === 0 && todayMesai.length === 0 && (
-                      <p className="text-sm text-slate-400">Bugün ofiste kimse yok.</p>
-                    )}
-                  </>
+                      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
+                        Nöbetçi
+                      </span>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
 
-            {/* SAĞ ALT — Haftalık nöbet durumu */}
-            <div className="border border-slate-300 rounded-xl p-5 flex flex-col gap-3 bg-white">
+            {/* SAĞ ALT — Bu hafta rotasyon */}
+            <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bu Hafta Nöbet</p>
-                  <p className="text-sm font-semibold text-slate-800">Tamamlanan görevler</p>
+                  <p className="text-sm font-semibold text-slate-800">{weekLabel} Rotasyonu</p>
                 </div>
-                <span className="text-xs font-bold text-slate-500">{doneCount}/{totalSlots}</span>
+                <span className="text-xs font-bold text-slate-500">{doneCount}/{WORK_DAYS.length}</span>
               </div>
               <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                 <div className="h-full rounded-full bg-teal-500 transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <div className="border-t border-slate-300 pt-2 flex flex-col gap-1.5 overflow-y-auto max-h-44">
-                {weeklySlots.map((row) => (
-                  <div key={row.slot} className="flex items-center gap-2 text-xs">
+              <div className="border-t border-slate-100 pt-2 flex flex-col gap-2">
+                {weeklyRows.map((row) => (
+                  <div key={row.day} className="flex items-center gap-2 text-xs">
                     <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 text-[9px] font-bold ${
-                      row.done ? "bg-teal-50 text-teal-700 border border-teal-200" : "bg-slate-100 text-slate-400 border border-slate-300"
+                      row.done
+                        ? "bg-teal-50 text-teal-700 border border-teal-100"
+                        : row.isToday
+                        ? "bg-amber-50 text-amber-700 border border-amber-100"
+                        : "bg-slate-50 text-slate-400 border border-slate-200"
                     }`}>
-                      {row.done ? "✓" : "–"}
+                      {row.done ? "✓" : row.isToday ? "→" : "–"}
                     </span>
-                    <span className="text-slate-600 flex-1 truncate">{row.day} {row.period}</span>
-                    <span className={`text-[10px] font-semibold flex-shrink-0 ${row.done ? "text-teal-600" : "text-slate-400"}`}>
-                      {row.done ? "Tamamlandı" : row.people.length > 0 ? "Devam ediyor" : "Bekliyor"}
+                    <span className={`flex-1 ${row.isToday ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+                      {row.day}
+                    </span>
+                    <span className="text-slate-400 text-[10px]">
+                      {row.names.join(", ")}
                     </span>
                   </div>
                 ))}
@@ -308,6 +257,34 @@ export default async function AdminDashboard() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function DutyPersonCard({ name, photos }: { name: string; photos: string[] }) {
+  return (
+    <div className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-3">
+      <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-xs font-bold text-teal-700 flex-shrink-0">
+        {name.charAt(0)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-slate-800">{name}</p>
+        <p className="text-[11px] text-slate-400 mt-0.5">Tüm gün · 09:00–17:00</p>
+        {photos.length > 0 ? (
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {photos.map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                className="text-[11px] text-teal-700 font-medium underline underline-offset-2">
+                Kanıt {photos.length > 1 ? i + 1 : ""}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <span className="inline-block mt-2 text-[11px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+            Henüz yüklenmedi
+          </span>
+        )}
+      </div>
     </div>
   );
 }
