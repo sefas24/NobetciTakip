@@ -16,14 +16,18 @@ export default async function KameraPage() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-6 max-w-lg w-full mx-auto flex flex-col gap-4">
+      <main className="flex-1 p-4 md:p-6 max-w-4xl w-full mx-auto flex flex-col gap-6">
 
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 flex gap-3 items-start">
-          <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-xs text-amber-700">
-            Nöbet başlangıcında ve bitişinde birer fotoğraf çek. Fotoğraflar admin panelinde görüntülenir.
+        {/* Top Information Block resembling the Admin Panel UI blocks */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <div className="flex justify-between items-start mb-3">
+             <div className="flex flex-col gap-1">
+               <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">FOTOĞRAF KANITI</div>
+               <h2 className="text-sm sm:text-base font-bold text-slate-800">Nöbetçi Fotoğraf Çekimi</h2>
+             </div>
+          </div>
+          <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">
+             Nöbet başlangıcında ve bitişinde ofiste bulunduğuna dair birer fotoğraf çekmelisiniz. Bu fotoğraflar yöneticiler tarafından admin panelinde görüntülenecek ve mesai onayında kanıt olarak kullanılacaktır.
           </p>
         </div>
 
