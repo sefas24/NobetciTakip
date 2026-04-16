@@ -67,10 +67,11 @@ export async function POST(req: Request) {
         error: unknown;
       };
 
+      console.log("FETCH RESULT:", JSON.stringify({ latestPref, fetchError }));
     if (fetchError || !latestPref) {
       return NextResponse.json({
         ok: true,
-        message: "Dosya yüklendi fakat nöbet kaydınız bulunamadığı için veritabanına bağlanamadı. Lütfen yöneticinizle iletişime geçin.",
+        message: "Dosya yuklendi fakat kayit bulunamadi.",
         url: publicUrl,
       });
     }
