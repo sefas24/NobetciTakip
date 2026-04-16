@@ -2,10 +2,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { ProofRequestCard } from "./ProofRequestCard";
+import { MesaiDonutChart } from "./MesaiDonutChart";
+import { DutyPersonCard } from "./DutyPersonCard";
 import {
   getCurrentRotationWeek,
   getDutyNamesForDay,
   WORK_DAYS,
+  WEEKLY_MESAI,
   type WorkDay,
 } from "@/constants/schedule";
 
@@ -44,48 +48,97 @@ export default async function AdminDashboard() {
   const doneCount = weeklyRows.filter((r) => r.done).length;
   const pct = Math.round((doneCount / WORK_DAYS.length) * 100);
 
-  // Fotoğrafları Supabase'den çek — sadece bugün nöbetçi olanlar
-  type PhotoRow = { email: string; image_url: string | null };
-  let photoMap: Record<string, string[]> = {};
+  // Fotoğrafları Supabase'den çek
+// namePhotoMap: ilk_ad → url[] — DutyPersonCard ve sol alt liste aynı haritayı kullanır
+type PhotoRow = { email: string; image_url: string | null; note: string | null };
+let namePhotoMap: Record<string, string[]> = {};
+let nameNoteMap: Record<string, string[]> = {};
+// Bugün mesaide olan kişileri hesapla
+  let todayMesaiNames: string[] = [];
+  let nonDutyMesaiNames: string[] = [];
+  // Pending proof request'leri çek
+  const { data: proofRequests } = await supabase
+    .from("proof_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
 
-  if (todayDutyNames.length > 0) {
-    // users tablosundan isim → email eşleşmesi
-    const { data: users } = await supabase
-      .from("users")
-      .select("email, isim_soyisim")
-      .in("isim_soyisim", todayDutyNames.map((n) => {
-        // rotasyonda sadece ilk ad var, tam isim bulmak için LIKE kullanmak yerine
-        // tüm kullanıcıları çekip filtreleyeceğiz
-        return n;
-      }));
+  const pendingRequests = (proofRequests ?? []) as {
+    id: string;
+    requester_email: string;
+    requester_name: string | null;
+    image_url: string;
+    note: string | null;
+    status: string;
+    created_at: string;
+  }[];
 
-    // Tüm kullanıcıları çek, rotasyon isimleriyle eşleştir
-    const { data: allUsers } = await supabase
-      .from("users")
-      .select("email, isim_soyisim");
+  if (isWeekday && todayWorkDay) {
+    const morningList = WEEKLY_MESAI[todayWorkDay]?.morning ?? [];
+    const afternoonList = WEEKLY_MESAI[todayWorkDay]?.afternoon ?? [];
+    // Sabah veya öğleden sonra mesaide olan herkesi birleştir
+    const allMesai = [...new Set([...morningList, ...afternoonList])];
+    todayMesaiNames = allMesai;
 
-    const dutyEmails: string[] = [];
-    for (const dutyFirstName of todayDutyNames) {
-      const match = allUsers?.find(
-        (u) => u.isim_soyisim?.split(" ")[0].toLowerCase() === dutyFirstName.toLowerCase()
-      );
-      if (match) dutyEmails.push(match.email);
+    // Nöbetçi olmayanlar — mesaide var ama rotasyonda yok
+    nonDutyMesaiNames = allMesai.filter(
+      (fullName) =>
+        !todayDutyNames.some(
+          (firstName) =>
+            fullName.toLowerCase().startsWith(firstName.toLowerCase())
+        )
+    );
+  }
+
+  const totalCount = todayMesaiNames.length;
+  const dutyCount = todayDutyNames.length;
+  const nonDutyCount = nonDutyMesaiNames.length;
+  const TOTAL_STAFF = 27;
+  const absentCount = TOTAL_STAFF - totalCount;
+
+if (todayDutyNames.length > 0) {
+  const { data: allUsers } = await supabase
+    .from("users")
+    .select("email, isim_soyisim");
+
+  const dutyEmailToFirstName: Record<string, string> = {};
+  const dutyEmails: string[] = [];
+
+  for (const dutyFirstName of todayDutyNames) {
+    const match = allUsers?.find(
+      (u) => u.isim_soyisim?.split(" ")[0].toLowerCase() === dutyFirstName.toLowerCase()
+    );
+    if (match) {
+      dutyEmails.push(match.email);
+      dutyEmailToFirstName[match.email] = dutyFirstName;
     }
+  }
 
-    if (dutyEmails.length > 0) {
-      const { data: prefs } = await supabase
-        .from("mesai_preferences")
-        .select("email, image_url")
-        .in("email", dutyEmails)
-        .eq("status", "approved");
+  if (dutyEmails.length > 0) {
+    // status filtresi yok — admin tüm yüklenmiş fotoğrafları görmeli
+    const { data: prefs } = await supabase
+      .from("mesai_preferences")
+      .select("email, image_url, note")
+      .in("email", dutyEmails);
 
-      for (const row of (prefs ?? []) as PhotoRow[]) {
-        if (row.image_url) {
-          photoMap[row.email] = row.image_url.split(",").filter(Boolean);
+
+    for (const row of (prefs ?? []) as PhotoRow[]) {
+      if (row.image_url) {
+        const firstName = dutyEmailToFirstName[row.email];
+        if (firstName) {
+          const urls = row.image_url.split(",").filter(Boolean);
+          if (!namePhotoMap[firstName]) namePhotoMap[firstName] = [];
+          for (const url of urls) {
+            if (!namePhotoMap[firstName].includes(url)) {
+              namePhotoMap[firstName].push(url);
+              if (row.note) nameNoteMap[firstName] = row.note.split("\n---\n");
+            }
+          }
         }
       }
     }
   }
+}
 
   return (
     <div className="min-h-screen bg-white">
@@ -133,20 +186,14 @@ export default async function AdminDashboard() {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {todayDutyNames.map((isim) => {
-                      // email bul
-                      const photos = photoMap[
-                        Object.keys(photoMap).find((email) => {
-                          return true; // photoMap zaten email keyed
-                        }) ?? ""
-                      ] ?? [];
-
-                      // photoMap'i isim üzerinden bulmak için ayrı bir yapı lazım
-                      // Bunu düzgün yapmak için dutyEmailMap kullanacağız
+                      const photos = namePhotoMap[isim] ?? [];
+                      const notes = nameNoteMap[isim] ?? [];
                       return (
                         <DutyPersonCard
                           key={isim}
                           name={isim}
-                          photos={[]}
+                          photos={photos}
+                          notes={notes}
                         />
                       );
                     })}
@@ -155,32 +202,31 @@ export default async function AdminDashboard() {
               </div>
             </div>
 
-            {/* SAĞ ÜST — Özet */}
+            {/* SAĞ ÜST — Kanıt İstekleri */}
             <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-4">
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugünkü Nöbet</p>
-                <p className="text-sm font-semibold text-slate-800">{todayDutyNames.length} nöbetçi</p>
-              </div>
-
-              <div className="flex-1 flex flex-col items-center justify-center">
-                {/* Basit sayı göstergesi */}
-                <div className="w-20 h-20 rounded-full border-4 border-teal-500 flex items-center justify-center mb-4">
-                  <span className="text-2xl font-black text-slate-800">{todayDutyNames.length}</span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Kanıt İstekleri</p>
+                  <p className="text-sm font-semibold text-slate-800">Bekleyen onaylar</p>
                 </div>
-                <p className="text-xs text-slate-400 text-center">
-                  {isWeekday ? `${weekLabel} rotasyonu` : "Hafta sonu"}
-                </p>
+                {pendingRequests.length > 0 && (
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    {pendingRequests.length} bekliyor
+                  </span>
+                )}
               </div>
 
-              <div className="border-t border-slate-100 pt-3 space-y-2">
-                {todayDutyNames.map((isim) => (
-                  <div key={isim} className="flex items-center gap-2 text-xs">
-                    <span className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0" />
-                    <span className="text-slate-700">{isim}</span>
-                  </div>
-                ))}
-                {!isWeekday && (
-                  <p className="text-xs text-slate-400">Hafta sonu nöbet yok.</p>
+              <div className="border-t border-slate-100 pt-3 flex flex-col gap-3 overflow-y-auto max-h-64">
+                {pendingRequests.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">Bekleyen istek yok.</p>
+                ) : (
+                  pendingRequests.map((req) => (
+                    <ProofRequestCard
+                      key={req.id}
+                      request={req}
+                      dutyNames={todayDutyNames}
+                    />
+                  ))
                 )}
               </div>
             </div>
@@ -189,32 +235,50 @@ export default async function AdminDashboard() {
           {/* ALT SATIR: 50 / 50 */}
           <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
 
-            {/* SOL ALT — Bugün nöbetçiler (detay) */}
+            {/* SOL ALT — Bugün nöbetçiler + halka grafik */}
             <div className="border border-slate-200 rounded-xl p-5 flex flex-col gap-3 mb-4 md:mb-0">
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugün Ofiste</p>
-                <p className="text-sm font-semibold text-slate-800">{todayName} — nöbetçiler</p>
-              </div>
-              <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-                {!isWeekday ? (
-                  <p className="text-sm text-slate-400">Bugün hafta sonu.</p>
-                ) : todayDutyNames.length === 0 ? (
-                  <p className="text-sm text-slate-400">Bu gün için nöbet tanımlı değil.</p>
-                ) : (
-                  todayDutyNames.map((isim) => (
-                    <div key={isim} className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-xs font-bold text-teal-700 flex-shrink-0">
-                        {isim.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{isim}</p>
-                        <p className="text-[11px] text-slate-400">Tüm gün · 09:00–17:00</p>
-                      </div>
-                      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
-                        Nöbetçi
-                      </span>
-                    </div>
-                  ))
+              <div className="flex items-center justify-between gap-4">
+
+                {/* Sol — nöbetçi listesi */}
+                <div className="flex flex-col gap-3 flex-1 min-w-0">
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Bugün Ofiste</p>
+                    <p className="text-sm font-semibold text-slate-800">{todayName} — nöbetçiler</p>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
+                    {!isWeekday ? (
+                      <p className="text-sm text-slate-400">Bugün hafta sonu.</p>
+                    ) : todayDutyNames.length === 0 ? (
+                      <p className="text-sm text-slate-400">Bu gün için nöbet tanımlı değil.</p>
+                    ) : (
+                      todayDutyNames.map((isim) => (
+                        <div key={isim} className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-xs font-bold text-teal-700 flex-shrink-0">
+                            {isim.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800">{isim}</p>
+                            <p className="text-[11px] text-slate-400">Tüm gün · 09:00–17:00</p>
+                          </div>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100 flex-shrink-0">
+                            Nöbetçi
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Sağ — halka grafik */}
+                {isWeekday && totalCount > 0 && (
+                  <div className="flex-shrink-0 overflow-visible">
+                    <MesaiDonutChart
+                      dutyCount={dutyCount}
+                      nonDutyCount={nonDutyCount}
+                      totalCount={totalCount}
+                      absentCount={absentCount}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -257,34 +321,6 @@ export default async function AdminDashboard() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function DutyPersonCard({ name, photos }: { name: string; photos: string[] }) {
-  return (
-    <div className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-3">
-      <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-xs font-bold text-teal-700 flex-shrink-0">
-        {name.charAt(0)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-800">{name}</p>
-        <p className="text-[11px] text-slate-400 mt-0.5">Tüm gün · 09:00–17:00</p>
-        {photos.length > 0 ? (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
-            {photos.map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                className="text-[11px] text-teal-700 font-medium underline underline-offset-2">
-                Kanıt {photos.length > 1 ? i + 1 : ""}
-              </a>
-            ))}
-          </div>
-        ) : (
-          <span className="inline-block mt-2 text-[11px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-            Henüz yüklenmedi
-          </span>
-        )}
-      </div>
     </div>
   );
 }
