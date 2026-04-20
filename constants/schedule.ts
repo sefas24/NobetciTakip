@@ -98,7 +98,7 @@ export const WEEKLY_MESAI: Record<WorkDay, {
       "Hasan Emre Kaya", "Buğra Öztürk", "Hasan Arda Yaman", "Utku Gümüş",
       "Mert Efe Ergün", "Ali Alper Tellioğlu", "Mehmet Burak Tarcan",
       "Esma Elif Öztürk", "Beril Kalmaz", "Sultan Yüksel",
-      "Fatma Başak Gündüz", "Yusuf Eren Bozkurt",
+      "Fatma Başak Gündüz", "Yusuf Eren Bozkurt", "Fatih Ege",
     ],
   },
   Salı: {
@@ -107,8 +107,8 @@ export const WEEKLY_MESAI: Record<WorkDay, {
       "Feyza Korkmaz", "Hasan Emre Kaya", "Sefa Sağırlı", "Buğra Öztürk",
       "Esma Elif Öztürk", "Hasan Arda Yaman", "Utku Gümüş", "Asya Özdem",
       "Eren Gönel", "Oğuzhan Önder", "Ali Alper Tellioğlu",
-      "Mehmet Burak Tarcan", "Yusuf Eren Bozkurt", "Hamza Aydemirdir",
-      "Fatma Başak Gündüz", "Mert Efe Ergün", "Furkan Çetin",
+      "Mehmet Burak Tarcan", "Sultan Yüksel", "Yusuf Eren Bozkurt",
+      "Hamza Aydemirdir", "Fatma Başak Gündüz", "Mert Efe Ergün", "Furkan Çetin",
     ],
     afternoon: [
       "Fatih Ege", "Tunahan Fırat", "Bedirhan Yalap", "Hakan Özdil",
@@ -125,25 +125,21 @@ export const WEEKLY_MESAI: Record<WorkDay, {
       "Hakan Özdil", "Yiğit Ünal", "Fatma Başak Gündüz", "Hasan Emre Kaya",
       "Sefa Sağırlı", "Buğra Öztürk", "Esma Elif Öztürk", "Utku Gümüş",
       "Mert Efe Ergün", "Asya Özdem", "Eren Gönel", "Oğuzhan Önder",
-      "Beril Kalmaz", "Hasan Arda Yaman", "Hamza Aydemirdir",
-      "Feyza Korkmaz", "Hilmi Melih Şanlı", "Begüm Çetin",
-      "Furkan Çetin", "Amine Beyza Seyitoğlu",
+      "Beril Kalmaz", "Hasan Arda Yaman", "Hamza Aydemirdir", "Feyza Korkmaz",
     ],
     afternoon: [
       "Fatih Ege", "Tunahan Fırat", "Bedirhan Yalap", "Yusuf Eren Bozkurt",
       "Hakan Özdil", "Yiğit Ünal", "Fatma Başak Gündüz", "Hasan Emre Kaya",
       "Sefa Sağırlı", "Buğra Öztürk", "Esma Elif Öztürk", "Utku Gümüş",
       "Mert Efe Ergün", "Asya Özdem", "Eren Gönel", "Oğuzhan Önder",
-      "Beril Kalmaz", "Hasan Arda Yaman", "Hamza Aydemirdir",
-      "Hilmi Melih Şanlı", "Begüm Çetin",
-      "Furkan Çetin", "Amine Beyza Seyitoğlu",
+      "Beril Kalmaz", "Hasan Arda Yaman", "Hamza Aydemirdir", "Feyza Korkmaz",
+      "Hilmi Melih Şanlı", "Begüm Çetin", "Furkan Çetin", "Amine Beyza Seyitoğlu",
     ],
   },
   Perşembe: {
     morning: [
       "Mehmet Burak Tarcan", "Sefa Sağırlı", "Hilmi Melih Şanlı", "Beril Kalmaz",
-      "Begüm Çetin", "Furkan Çetin", "Mert Efe Ergün",
-      "Hamza Aydemirdir", "Fatma Başak Gündüz",
+      "Mert Efe Ergün", "Hamza Aydemirdir", "Fatma Başak Gündüz",
     ],
     afternoon: [
       "Mehmet Burak Tarcan", "Sefa Sağırlı", "Hilmi Melih Şanlı", "Beril Kalmaz",
@@ -153,14 +149,13 @@ export const WEEKLY_MESAI: Record<WorkDay, {
   Cuma: {
     morning: [
       "Tunahan Fırat", "Bedirhan Yalap", "Amine Beyza Seyitoğlu", "Yiğit Ünal",
-      "Eren Gönel", "Oğuzhan Önder", "Sultan Yüksel", "Begüm Çetin",
-      "Furkan Çetin", "Fatih Ege", "Asya Özdem",
-      "Hamza Aydemirdir", "Hilmi Melih Şanlı",
+      "Eren Gönel", "Oğuzhan Önder", "Sultan Yüksel",
+      "Fatih Ege", "Asya Özdem", "Hamza Aydemirdir", "Hilmi Melih Şanlı",
     ],
     afternoon: [
       "Tunahan Fırat", "Bedirhan Yalap", "Amine Beyza Seyitoğlu", "Yiğit Ünal",
-      "Eren Gönel", "Oğuzhan Önder", "Sultan Yüksel", "Begüm Çetin",
-      "Furkan Çetin",
+      "Eren Gönel", "Oğuzhan Önder", "Sultan Yüksel",
+      "Begüm Çetin", "Furkan Çetin",
     ],
   },
 };

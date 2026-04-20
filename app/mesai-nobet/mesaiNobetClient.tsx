@@ -5,14 +5,6 @@ import { WEEKLY_MESAI, type WorkDay } from "@/constants/schedule";
 
 const WORK_DAYS: WorkDay[] = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
-const DAY_COLORS: Record<string, { badge: string; dot: string; header: string }> = {
-  Pazartesi: { badge: "bg-teal-50 text-teal-700 border-teal-100",     dot: "bg-teal-500",    header: "border-teal-100" },
-  Salı:      { badge: "bg-violet-50 text-violet-700 border-violet-100", dot: "bg-violet-400", header: "border-violet-100" },
-  Çarşamba:  { badge: "bg-amber-50 text-amber-700 border-amber-100",  dot: "bg-amber-400",   header: "border-amber-100" },
-  Perşembe:  { badge: "bg-rose-50 text-rose-700 border-rose-100",     dot: "bg-rose-400",    header: "border-rose-100" },
-  Cuma:      { badge: "bg-sky-50 text-sky-700 border-sky-100",        dot: "bg-sky-400",     header: "border-sky-100" },
-};
-
 interface Props {
   currentWeek: 0 | 1;
   h1Schedule: Record<WorkDay, string[]>;
@@ -91,18 +83,23 @@ function DayCard({ day, dutyNames, userFirstName, userFullName }: {
   userFirstName: string | null;
   userFullName: string | null;
 }) {
-  const color = DAY_COLORS[day];
   const mesai = WEEKLY_MESAI[day];
+
+  const allNames = [
+    ...mesai.morning,
+    ...mesai.afternoon.filter((isim) => !mesai.morning.includes(isim)),
+  ];
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+
       {/* Başlık */}
-      <div className={`px-4 py-3 border-b ${color.header} flex items-center justify-between`}>
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${color.dot}`} />
+          <span className="w-2 h-2 rounded-full bg-sky-400" />
           <span className="text-sm font-bold text-slate-800">{day}</span>
         </div>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border ${color.badge}`}>
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border bg-sky-50 text-sky-700 border-sky-100">
           {dutyNames.length} nöbetçi
         </span>
       </div>
@@ -115,9 +112,14 @@ function DayCard({ day, dutyNames, userFirstName, userFullName }: {
             const isSelf = userFirstName &&
               isim.toLowerCase() === userFirstName.toLowerCase();
             return (
-              <span key={isim} className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border ${
-                isSelf ? "bg-red-50 text-red-700 border-red-100" : "bg-sky-50 text-sky-800 border-sky-100"
-              }`}>
+              <span
+                key={isim}
+                className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border ${
+                  isSelf
+                    ? "bg-red-50 text-red-700 border-red-100"
+                    : "bg-sky-50 text-sky-800 border-sky-100"
+                }`}
+              >
                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 flex-shrink-0" />
                 {isim}
                 {isSelf && <span className="text-[10px] ml-0.5">(Sen)</span>}
@@ -127,44 +129,68 @@ function DayCard({ day, dutyNames, userFirstName, userFullName }: {
         </div>
       </div>
 
-      {/* Mesai — Öğleden Önce */}
-      <div className="px-4 py-3 border-b border-slate-100">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Öğleden Önce · 09:00–12:30
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {mesai.morning.map((isim) => {
-            const isSelf = userFullName &&
-              isim.toLowerCase() === userFullName.toLowerCase();
-            return (
-              <span key={isim} className={`text-xs px-2 py-0.5 rounded-lg border ${
-                isSelf ? "bg-sky-100 text-sky-800 border-sky-200 font-semibold" : "bg-slate-50 text-slate-500 border-slate-200"
-              }`}>
-                {isim}
-              </span>
-            );
-          })}
+      {/* Mesai Tablosu */}
+      <div className="flex flex-col">
+        {/* Tablo başlığı */}
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <div className="px-4 py-2 border-r border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Öğleden Önce · 09:00–12:30
+            </p>
+          </div>
+          <div className="px-4 py-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Öğleden Sonra · 13:30–17:00
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Mesai — Öğleden Sonra */}
-      <div className="px-4 py-3">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-          Öğleden Sonra · 13:30–17:00
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {mesai.afternoon.map((isim) => {
-            const isSelf = userFullName &&
-              isim.toLowerCase() === userFullName.toLowerCase();
-            return (
-              <span key={isim} className={`text-xs px-2 py-0.5 rounded-lg border ${
-                isSelf ? "bg-sky-100 text-sky-800 border-sky-200 font-semibold" : "bg-slate-50 text-slate-500 border-slate-200"
-              }`}>
-                {isim}
-              </span>
-            );
-          })}
-        </div>
+        {/* Satırlar */}
+        {allNames.map((isim, i) => {
+          const hasMorning = mesai.morning.includes(isim);
+          const hasAfternoon = mesai.afternoon.includes(isim);
+          const isSelf = userFullName &&
+            isim.toLowerCase() === userFullName.toLowerCase();
+
+          return (
+            <div
+              key={isim}
+              className={`grid grid-cols-2 ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
+            >
+              {/* Öğleden Önce */}
+              <div className="px-4 py-1.5 border-r border-slate-100 flex items-center">
+                {hasMorning && (
+                  <>
+                    <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
+                      {isim}
+                    </span>
+                    {isSelf && (
+                      <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
+                        Sen
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Öğleden Sonra */}
+              <div className="px-4 py-1.5 flex items-center">
+                {hasAfternoon && (
+                  <>
+                    <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
+                      {isim}
+                    </span>
+                    {isSelf && (
+                      <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
+                        Sen
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
