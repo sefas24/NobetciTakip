@@ -38,6 +38,7 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
         ok: boolean;
         message?: string;
         needsPasswordChange?: boolean;
+        role?: string;
       };
 
       if (!res.ok || !data.ok) {
@@ -46,14 +47,23 @@ export default function LoginClient({ nextPath }: { nextPath?: string }) {
         return;
       }
 
-      let target =
-        nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
-          ? nextPath
-          : "/";
+                // YENİ
+          if (data.needsPasswordChange) {
+            window.location.href = "/sifre-belirle";
+            return;
+          }
 
-      if (data.needsPasswordChange) target = "/sifre-belirle";
+          if (data.role === "admin") {
+            window.location.href = "/admin";
+            return;
+          }
 
-      window.location.href = target;
+          const target =
+            nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+              ? nextPath
+              : "/";
+
+          window.location.href = target;
     } catch {
       setError("Giriş sırasında hata oluştu.");
       setLoading(false);

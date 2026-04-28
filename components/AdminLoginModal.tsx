@@ -13,6 +13,7 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const usernameRef = useRef<HTMLInputElement>(null);
+  
 
   useEffect(() => {
     if (isOpen) {
@@ -38,6 +39,8 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
     setLoading(true);
     setError(null);
     try {
+      // Mevcut oturumu temizle — eski rol cookie'si yeni oturumla çakışmasın
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,7 +91,7 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
               required
               placeholder="admin"
               autoComplete="username"
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
             />
           </div>
           <div className="space-y-1">
@@ -102,7 +105,7 @@ export function AdminLoginModal({ isOpen, onClose }: AdminLoginModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="••••••••"
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition"
             />
           </div>
           {error && (

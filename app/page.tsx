@@ -18,8 +18,6 @@ export default async function AnaSayfa() {
   const email = store.get("nt_email")?.value;
   const name = store.get("nt_isim_soyisim")?.value;
 
-  if (role === "admin") redirect("/admin");
-
   const displayName = name || email || "Öğrenci";
   const firstName = name ? name.split(" ")[0] : (email || "Öğrenci");
 
@@ -64,7 +62,7 @@ export default async function AnaSayfa() {
         <SidebarMenu role={role} />
         <div className="flex items-center gap-3">
           
-          <AdminLoginButton />
+        <AdminLoginButton isAdmin={role === "admin"} />
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-sky-700">

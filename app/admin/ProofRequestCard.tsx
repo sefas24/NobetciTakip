@@ -25,12 +25,15 @@ export function ProofRequestCard({
   const [rejectionReason, setRejectionReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    if (decision === "accepted" && !assignedTo) return;
-    if (decision === "rejected" && !rejectionReason.trim()) return;
+  if (decision === "accepted" && !assignedTo) return;
+  if (decision === "rejected" && !rejectionReason.trim()) return;
 
-    setLoading(true);
+  setLoading(true);
+  setError(null);
+  try {
     const res = await fetch("/api/proof-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,9 +44,18 @@ export function ProofRequestCard({
         rejection_reason: rejectionReason || undefined,
       }),
     });
+    if (res.ok) {
+      setDone(true);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data?.message ?? `İşlem başarısız (${res.status}). Sayfayı yenileyip tekrar deneyin.`);
+    }
+  } catch {
+    setError("Sunucu bağlantı hatası. Lütfen tekrar deneyin.");
+  } finally {
     setLoading(false);
-    if (res.ok) setDone(true);
   }
+}
 
   if (done) {
     return (
@@ -173,7 +185,7 @@ export function ProofRequestCard({
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Gerekçenizi yazın..."
                 rows={3}
-                className="text-xs border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-slate-300"
+                className="text-xs text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-slate-300"
               />
               <div className="flex gap-2">
                 <button

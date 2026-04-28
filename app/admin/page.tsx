@@ -151,12 +151,20 @@ if (todayDutyNames.length > 0) {
               {todayName} · {weekLabel} Haftası · Hoş geldin, {adminName}
             </p>
           </div>
-          <Link
-            href="/logout"
-            className="text-xs bg-slate-900 text-white px-3 py-1.5 rounded-full hover:bg-slate-700 transition"
-          >
-            Çıkış
-          </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 hover:border-teal-300 active:scale-95 transition-all duration-150 whitespace-nowrap"
+              >
+                👤 Öğrenci Paneli
+              </Link>
+              <Link
+                href="/logout"
+                className="text-xs bg-slate-900 text-white px-3 py-1.5 rounded-full hover:bg-slate-700 transition"
+              >
+                Çıkış
+              </Link>
+            </div>
         </div>
       </header>
 
