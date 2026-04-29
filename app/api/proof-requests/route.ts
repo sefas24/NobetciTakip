@@ -47,14 +47,17 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
 
+  // ─── KABUL ───────────────────────────────────────────────────────────────
   if (decision === "accepted" && assigned_to) {
-    // ✅ YENİ: task_ids'i de çek
+
+    // proofRow'u en başta, koşulsuz olarak çek
     const { data: proofRow } = await supabase
       .from("proof_requests")
       .select("image_url, note, task_ids, requester_name")
       .eq("id", id)
       .single();
 
+    // 1) Fotoğrafı nöbetçinin mesai_preferences'ına ekle
     if (proofRow?.image_url) {
       const { data: allUsers } = await supabase
         .from("users")
@@ -96,8 +99,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // ✅ YENİ: Onay anında duty_tasks'a kaydet
+    // 2) Görevleri duty_tasks'a kaydet — artık image_url koşulundan bağımsız
     if (proofRow?.task_ids?.length) {
+      console.log("TASK IDS RAW:", JSON.stringify(proofRow?.task_ids), typeof proofRow?.task_ids);
       const today = new Date().toISOString().split("T")[0];
       for (const taskId of proofRow.task_ids) {
         await supabase
@@ -105,13 +109,39 @@ export async function POST(req: Request) {
           .upsert(
             {
               task_id: taskId,
-              completed_by_name: proofRow.requester_name ?? assigned_to,
+              completed_by_name: assigned_to,
               date: today,
             },
             { onConflict: "task_id,date" }
           );
       }
       console.log("DUTY TASKS SAVED for:", proofRow.requester_name);
+    } else {
+      console.log("NO TASK IDS FOUND in proofRow:", proofRow);
+    }
+  }
+
+  // ─── RED — kullanıcıya bildirim gönder ───────────────────────────────────
+  if (decision === "rejected") {
+    const { data: proofRow } = await supabase
+      .from("proof_requests")
+      .select("requester_email, requester_name")
+      .eq("id", id)
+      .single();
+
+    if (proofRow?.requester_email) {
+      const gerekce = rejection_reason?.trim()
+        ? rejection_reason.trim()
+        : "Gerekçe belirtilmedi.";
+
+      await supabase.from("notifications").insert({
+        recipient_email: proofRow.requester_email,
+        type: "proof_rejected",
+        title: "Kanıt İsteğin Reddedildi",
+        message: `Gönderdiğin kanıt isteği admin tarafından reddedildi.\n\nGerekçe: ${gerekce}`,
+      });
+
+      console.log("NOTIFICATION SENT to:", proofRow.requester_email);
     }
   }
 

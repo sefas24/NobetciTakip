@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import SidebarMenu from "@/components/SidebarMenu";
+import { supabase } from "@/lib/supabase";
+import NotificationBanner from "@/components/NotificationBanner";
 import { AdminLoginButton } from "@/components/AdminLoginButton";
 import {
   getCurrentRotationWeek,
@@ -54,6 +56,16 @@ export default async function AnaSayfa() {
     ? todayMesai.afternoon.some((n) => n.toLowerCase() === userFullName.toLowerCase())
     : false;
 
+  const { data: rawNotifications } = email
+          ? await supabase
+              .from("notifications")
+              .select("id, title, message, created_at")
+              .eq("recipient_email", email)
+              .eq("is_read", false)
+              .order("created_at", { ascending: false })
+          : { data: [] };
+  const userNotifications = rawNotifications ?? [];
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
 
@@ -78,7 +90,10 @@ export default async function AnaSayfa() {
       </header>
 
       <main className="flex-1 px-4 py-6 max-w-lg mx-auto w-full flex flex-col gap-4">
-
+        {/* Bildirimler */}
+        {userNotifications.length > 0 && (
+          <NotificationBanner notifications={userNotifications} />
+        )}
         {/* Karşılama */}
         <div>
           <h1 className="text-xl font-bold text-slate-900 leading-tight">
