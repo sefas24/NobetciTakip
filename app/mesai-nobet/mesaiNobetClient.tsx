@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { WEEKLY_MESAI, type WorkDay } from "@/constants/schedule";
+import { type WorkDay } from "@/constants/schedule";
 
 const WORK_DAYS: WorkDay[] = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
@@ -10,10 +10,9 @@ interface Props {
   h1Schedule: Record<WorkDay, string[]>;
   h2Schedule: Record<WorkDay, string[]>;
   userFirstName: string | null;
-  userFullName: string | null;
 }
 
-export default function MesaiNobetClient({ currentWeek, h1Schedule, h2Schedule, userFirstName, userFullName }: Props) {
+export default function MesaiNobetClient({ currentWeek, h1Schedule, h2Schedule, userFirstName }: Props) {
   const [viewWeek, setViewWeek] = useState<0 | 1>(currentWeek);
   const schedule = viewWeek === 0 ? h1Schedule : h2Schedule;
 
@@ -53,7 +52,6 @@ export default function MesaiNobetClient({ currentWeek, h1Schedule, h2Schedule, 
               day={day}
               dutyNames={schedule[day]}
               userFirstName={userFirstName}
-              userFullName={userFullName}
             />
           ))}
         </div>
@@ -64,32 +62,23 @@ export default function MesaiNobetClient({ currentWeek, h1Schedule, h2Schedule, 
               day={day}
               dutyNames={schedule[day]}
               userFirstName={userFirstName}
-              userFullName={userFullName}
             />
           ))}
         </div>
       </div>
 
       <p className="text-center text-xs text-slate-300 mt-8">
-        Nöbetçiler 2 haftalık rotasyona göre · Mesai sabit program
+        Nöbetçiler 2 haftalık rotasyona göre belirlenir.
       </p>
     </main>
   );
 }
 
-function DayCard({ day, dutyNames, userFirstName, userFullName }: {
+function DayCard({ day, dutyNames, userFirstName }: {
   day: WorkDay;
   dutyNames: string[];
   userFirstName: string | null;
-  userFullName: string | null;
 }) {
-  const mesai = WEEKLY_MESAI[day];
-
-  const allNames = [
-    ...mesai.morning,
-    ...mesai.afternoon.filter((isim) => !mesai.morning.includes(isim)),
-  ];
-
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
 
@@ -105,7 +94,7 @@ function DayCard({ day, dutyNames, userFirstName, userFullName }: {
       </div>
 
       {/* Nöbetçiler */}
-      <div className="px-4 py-3 border-b border-slate-100">
+      <div className="px-4 py-3">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nöbetçiler</p>
         <div className="flex flex-wrap gap-1.5">
           {dutyNames.map((isim) => {
@@ -127,70 +116,6 @@ function DayCard({ day, dutyNames, userFirstName, userFullName }: {
             );
           })}
         </div>
-      </div>
-
-      {/* Mesai Tablosu */}
-      <div className="flex flex-col">
-        {/* Tablo başlığı */}
-        <div className="grid grid-cols-2 border-b border-slate-100">
-          <div className="px-4 py-2 border-r border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Öğleden Önce · 09:00–12:30
-            </p>
-          </div>
-          <div className="px-4 py-2">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Öğleden Sonra · 13:30–17:00
-            </p>
-          </div>
-        </div>
-
-        {/* Satırlar */}
-        {allNames.map((isim, i) => {
-          const hasMorning = mesai.morning.includes(isim);
-          const hasAfternoon = mesai.afternoon.includes(isim);
-          const isSelf = userFullName &&
-            isim.toLowerCase() === userFullName.toLowerCase();
-
-          return (
-            <div
-              key={isim}
-              className={`grid grid-cols-2 ${i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
-            >
-              {/* Öğleden Önce */}
-              <div className="px-4 py-1.5 border-r border-slate-100 flex items-center">
-                {hasMorning && (
-                  <>
-                    <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
-                      {isim}
-                    </span>
-                    {isSelf && (
-                      <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
-                        Sen
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Öğleden Sonra */}
-              <div className="px-4 py-1.5 flex items-center">
-                {hasAfternoon && (
-                  <>
-                    <span className={`text-xs ${isSelf ? "text-sky-700 font-semibold" : "text-slate-600"}`}>
-                      {isim}
-                    </span>
-                    {isSelf && (
-                      <span className="ml-auto text-[10px] bg-sky-50 text-sky-600 border border-sky-100 px-1.5 py-0.5 rounded font-medium">
-                        Sen
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

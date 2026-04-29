@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
+const NOBET_GOREVLERI = [
+  { id: "sabah_cay_kahve", label: "Sabah çay ve kahveyi hazırladım",    zaman: "Sabah · Erken geliş" },
+  { id: "aksam_temizlik",  label: "Akşam çay/kahve alanını temizledim", zaman: "Akşam · Geç çıkış"   },
+  { id: "tezgah_temiz",    label: "Tezgahı temiz bıraktım",              zaman: "Akşam · Geç çıkış"   },
+  { id: "masalar_temiz",   label: "Masaları temizledim",                 zaman: "Akşam · Geç çıkış"   },
+  { id: "sandalyeler",     label: "Sandalyeleri düzenledim",             zaman: "Akşam · Geç çıkış"   },
+] as const;
+
 export default function CameraCapture() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -14,6 +22,15 @@ export default function CameraCapture() {
   const [photoFilename, setPhotoFilename] = useState<string>("nobet-kanit.jpg");
   const [uploading, setUploading] = useState(false);
   const [note, setNote] = useState<string>("");
+
+  const [checkedGorevler, setCheckedGorevler] = useState<Record<string, boolean>>({});
+
+  type CompletedTask = { task_id: string; completed_by_name: string };
+  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
+  const enAzBirSecili = NOBET_GOREVLERI.some((g) => checkedGorevler[g.id]);
+  const tamamlananSayi = completedTasks.length;
 
   const isSecureContextHint = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -37,22 +54,17 @@ export default function CameraCapture() {
     setError(null);
     setPhotoDataUrl(null);
 
-    if (
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices?.getUserMedia
-    ) {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setError("Bu cihaz/tarayıcı kamera erişimini desteklemiyor.");
       return;
     }
 
     try {
       await stopCamera();
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
-
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -60,10 +72,7 @@ export default function CameraCapture() {
       }
       setRunning(true);
     } catch (e) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : "Kameraya erişilemedi. İzin verdiğinizden emin olun.";
+      const msg = e instanceof Error ? e.message : "Kameraya erişilemedi. İzin verdiğinizden emin olun.";
       setError(msg);
       setRunning(false);
     }
@@ -86,30 +95,29 @@ export default function CameraCapture() {
     ctx.drawImage(video, 0, 0, width, height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setPhotoDataUrl(dataUrl);
-    const stamp = new Date()
-      .toISOString()
-      .replaceAll(":", "-")
-      .replaceAll(".", "-");
+    const stamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
     setPhotoFilename(`nobet-kanit-${stamp}.jpg`);
   };
 
   useEffect(() => {
-    return () => {
-      void stopCamera();
-    };
+    fetch("/api/duty-tasks")
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) setCompletedTasks(d.data); })
+      .finally(() => setLoadingTasks(false));
   }, []);
 
-  // Ensure stream stays attached when video element mounts conditionally
+  useEffect(() => {
+    return () => { void stopCamera(); };
+  }, []);
+
   useEffect(() => {
     if (running && !photoDataUrl && videoRef.current && streamRef.current) {
       if (videoRef.current.srcObject !== streamRef.current) {
         videoRef.current.srcObject = streamRef.current;
-        videoRef.current.play().catch(() => { });
+        videoRef.current.play().catch(() => {});
       }
     }
   }, [running, photoDataUrl]);
-
-  // --- Photo Upload Flow (Phase 7) ---
 
   const validateFile = (file: File) => {
     const validTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -117,38 +125,31 @@ export default function CameraCapture() {
       toast.error("Lütfen sadece JPEG, PNG veya WEBP türünde bir resim seçin.");
       return false;
     }
-
-    const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
+    const maxSizeInBytes = 5 * 1024 * 1024;
     if (file.size > maxSizeInBytes) {
       toast.error("Dosya boyutu 5MB'den büyük olamaz.");
       return false;
     }
-
     return true;
   };
 
   const handleFileUploadMenu = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!validateFile(file)) {
       e.target.value = "";
       return;
     }
-
     await uploadFileToSupabase(file, note.trim() || null);
     e.target.value = "";
   };
 
-  // Convert canvas Base64 Data URL to a native File object and upload it
   const handleUploadCapturedPhoto = async () => {
     if (!photoDataUrl) return;
-
     try {
       const res = await fetch(photoDataUrl);
       const blob = await res.blob();
       const file = new File([blob], photoFilename, { type: "image/jpeg" });
-
       await uploadFileToSupabase(file, note.trim() || null);
     } catch {
       toast.error("Kamera fotoğrafı dönüştürülürken hata oluştu.");
@@ -162,9 +163,13 @@ export default function CameraCapture() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      if (noteText) {
-        formData.append("note", noteText);
-      }
+      if (noteText) formData.append("note", noteText);
+
+      // Seçilen görev ID'lerini de gönder
+      const secilenGorevIds = NOBET_GOREVLERI
+        .filter((g) => checkedGorevler[g.id] && !completedTasks.find((c) => c.task_id === g.id))
+        .map((g) => g.id);
+      formData.append("task_ids", JSON.stringify(secilenGorevIds));
 
       const res = await fetch("/api/mesai/upload-proof", {
         method: "POST",
@@ -177,9 +182,17 @@ export default function CameraCapture() {
         throw new Error(data.message || "Fotoğraf yüklenemedi.");
       }
 
+      // Nöbetçiyse görevler upload-proof içinde zaten kaydedildi
+      // Nöbetçi değilse görevler admin onayında kaydedilecek
+      // Burada duty-tasks çağrısı YOK
+
       toast.success("Fotoğraf başarıyla nöbet kaydınıza eklendi!", { id: loadingToast });
       setPhotoDataUrl(null);
       setNote("");
+      setCheckedGorevler({});
+      const refreshed = await fetch("/api/duty-tasks").then((r) => r.json());
+      if (refreshed.ok) setCompletedTasks(refreshed.data);
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu.";
       toast.error(msg, { id: loadingToast });
@@ -188,22 +201,88 @@ export default function CameraCapture() {
     }
   };
 
-
   return (
     <div className="w-full space-y-4">
       {isSecureContextHint ? (
         <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-xs flex items-center gap-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
           <p>{isSecureContextHint}</p>
         </div>
       ) : null}
 
       {error ? (
         <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl px-4 py-3 text-xs flex items-center gap-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           <p>{error}</p>
         </div>
       ) : null}
+
+      {/* Nöbet Görevleri */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Nöbet Görevleri</span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+            {tamamlananSayi}/{NOBET_GOREVLERI.length} tamamlandı
+          </span>
+        </div>
+
+        <div className="divide-y divide-slate-50 px-4">
+          {loadingTasks ? (
+            <p className="text-xs text-slate-400 py-4 text-center">Yükleniyor...</p>
+          ) : (
+            NOBET_GOREVLERI.map((gorev) => {
+              const completed = completedTasks.find((c) => c.task_id === gorev.id);
+              const checked = !!checkedGorevler[gorev.id];
+
+              if (completed) {
+                return (
+                  <div key={gorev.id} className="flex items-center gap-3 py-3 opacity-60">
+                    <div className="w-5 h-5 rounded-md bg-teal-500 border-2 border-teal-500 flex-shrink-0 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold line-through text-slate-400">{gorev.label}</p>
+                      <p className="text-[10px] text-teal-600 mt-0.5">{completed.completed_by_name} tamamladı</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={gorev.id}
+                  onClick={() => setCheckedGorevler((prev) => ({ ...prev, [gorev.id]: !prev[gorev.id] }))}
+                  className="flex items-center gap-3 py-3 cursor-pointer group"
+                >
+                  <div
+                    className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                      checked ? "bg-teal-500 border-teal-500" : "border-slate-300 group-hover:border-teal-400"
+                    }`}
+                  >
+                    {checked && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold ${checked ? "text-teal-700" : "text-slate-700"}`}>
+                      {gorev.label}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{gorev.zaman}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
 
       {!running && !photoDataUrl && (
         <div className="bg-white border border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-sm min-h-[300px]">
@@ -265,7 +344,6 @@ export default function CameraCapture() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photoDataUrl} alt="Önizleme" className="w-full h-full object-cover" />
           </div>
-          {/* Açıklama / Not Alanı */}
           <div className="px-4 pt-4 pb-2">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
               Açıklama <span className="text-slate-400 font-normal normal-case">(isteğe bağlı)</span>
@@ -288,14 +366,19 @@ export default function CameraCapture() {
             </a>
             <button
               onClick={handleUploadCapturedPhoto}
-              disabled={uploading}
-              className="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-teal-600 text-white text-[13px] font-bold hover:bg-teal-700 transition shadow-sm border border-teal-700 disabled:opacity-70"
+              disabled={uploading || !enAzBirSecili}
+              title={!enAzBirSecili ? "En az bir nöbet görevini işaretlemelisin" : undefined}
+              className={`inline-flex items-center justify-center px-6 py-2.5 rounded-lg text-[13px] font-bold transition shadow-sm border disabled:cursor-not-allowed ${
+                enAzBirSecili
+                  ? "bg-teal-600 text-white hover:bg-teal-700 border-teal-700 disabled:opacity-70"
+                  : "bg-slate-100 text-slate-400 border-slate-200"
+              }`}
             >
               {uploading ? (
                 <>
                   <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   Yükleniyor...
                 </>
@@ -304,7 +387,6 @@ export default function CameraCapture() {
               )}
             </button>
           </div>
-
         </div>
       )}
 

@@ -26,6 +26,9 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const note = (formData.get("note") as string | null)?.trim() || null;
+    // ✅ YENİ: CameraCapture'dan gelen görev listesini al
+    const taskIdsRaw = formData.get("task_ids") as string | null;
+    const taskIds: string[] = taskIdsRaw ? JSON.parse(taskIdsRaw) : [];
 
     if (!file) {
       return NextResponse.json(
@@ -54,14 +57,12 @@ export async function POST(req: Request) {
       .from("rapor_fotograflari")
       .getPublicUrl(fileName);
 
-    // Kullanıcı bilgisini çek
     const { data: userRow } = await supabase
       .from("users")
       .select("isim_soyisim, role")
       .eq("email", email)
       .single();
 
-    // Bugün nöbetçi mi kontrol et — rotasyondan
     const now = new Date();
     const todayIndex = now.getDay();
     const todayName = DAY_NAMES[todayIndex];
@@ -83,15 +84,16 @@ export async function POST(req: Request) {
     console.log("DEBUG:", { email, fullName, firstName, todayDutyNames, isDuty, role: userRow?.role });
 
     if (!isDuty) {
-      // Nöbetçi değil — proof_requests tablosuna ekle
+      // Nöbetçi değil — proof_requests tablosuna ekle, task_ids de kaydet
       await supabase.from("proof_requests").insert({
         requester_email: email,
         requester_name: fullName || email,
         image_url: publicUrl,
         note: note ?? null,
+        task_ids: taskIds, // ✅ YENİ
       });
 
-      return NextResponse.json({ ok: true, message: "İstek gönderildi.", url: publicUrl });
+      return NextResponse.json({ ok: true, isDuty: false, message: "İstek gönderildi.", url: publicUrl });
     }
 
     // Nöbetçi — mesai_preferences tablosunu güncelle
@@ -135,7 +137,20 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, message: "Başarılı", url: publicUrl });
+    // ✅ YENİ: Nöbetçiyse görevleri anında duty_tasks'a kaydet
+    if (taskIds.length > 0) {
+      const today = now.toISOString().split("T")[0];
+      for (const taskId of taskIds) {
+        await supabase
+          .from("duty_tasks")
+          .upsert(
+            { task_id: taskId, completed_by_name: fullName, date: today },
+            { onConflict: "task_id,date" }
+          );
+      }
+    }
+
+    return NextResponse.json({ ok: true, isDuty: true, message: "Başarılı", url: publicUrl });
 
   } catch (error: unknown) {
     const errorMsg = error instanceof Error

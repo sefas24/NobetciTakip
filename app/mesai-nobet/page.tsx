@@ -17,10 +17,6 @@ export default async function MesaiNobetPage() {
 
   const userFirstName = name ? name.split(" ")[0] : null;
 
-  // Şunu ekle:
-  const userFullName = name ?? null;
-
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center gap-3">
@@ -36,7 +32,6 @@ export default async function MesaiNobetPage() {
         h1Schedule={h1Schedule}
         h2Schedule={h2Schedule}
         userFirstName={userFirstName}
-        userFullName={userFullName}   // ← bu satırı ekle
       />
     </div>
   );

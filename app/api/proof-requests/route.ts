@@ -36,7 +36,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: "Eksik parametre" }, { status: 400 });
   }
 
-  // proof_requests tablosunu güncelle
   const updatePayload: Record<string, string> = { status: decision };
   if (decision === "accepted" && assigned_to) updatePayload.assigned_to = assigned_to;
   if (decision === "rejected" && rejection_reason) updatePayload.rejection_reason = rejection_reason;
@@ -48,17 +47,15 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
 
-  // Kabul edilirse — atanan nöbetçinin mesai_preferences kaydına görseli ekle
   if (decision === "accepted" && assigned_to) {
-    // İsteğin görsel URL'sini çek
+    // ✅ YENİ: task_ids'i de çek
     const { data: proofRow } = await supabase
       .from("proof_requests")
-      .select("image_url, note")
+      .select("image_url, note, task_ids, requester_name")
       .eq("id", id)
       .single();
 
     if (proofRow?.image_url) {
-      // Nöbetçinin emailini bul
       const { data: allUsers } = await supabase
         .from("users")
         .select("email, isim_soyisim");
@@ -70,7 +67,6 @@ export async function POST(req: Request) {
       console.log("ASSIGNED USER MATCH:", match);
 
       if (match) {
-        // Mevcut mesai_preferences kaydını çek
         const { data: pref } = await supabase
           .from("mesai_preferences")
           .select("id, image_url, note")
@@ -98,6 +94,24 @@ export async function POST(req: Request) {
           console.log("NO PREF FOUND for:", match.email);
         }
       }
+    }
+
+    // ✅ YENİ: Onay anında duty_tasks'a kaydet
+    if (proofRow?.task_ids?.length) {
+      const today = new Date().toISOString().split("T")[0];
+      for (const taskId of proofRow.task_ids) {
+        await supabase
+          .from("duty_tasks")
+          .upsert(
+            {
+              task_id: taskId,
+              completed_by_name: proofRow.requester_name ?? assigned_to,
+              date: today,
+            },
+            { onConflict: "task_id,date" }
+          );
+      }
+      console.log("DUTY TASKS SAVED for:", proofRow.requester_name);
     }
   }
 
